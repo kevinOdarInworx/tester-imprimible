@@ -162,23 +162,78 @@ def _get_tunnel(env: dict) -> _Tunnel:
         return tunnel
 
 
-def get_connection(env_key: str) -> oracledb.Connection:
-    """Abre (o reusa) el tunel del ambiente y devuelve una conexion oracledb."""
+class _PooledConnection:
+    """Envoltorio de una conexion Oracle real cacheada por ambiente.
+
+    Todo el codigo llamador usa `with get_connection(env) as conn:` (para
+    cerrar prolijo si fuera una conexion nueva cada vez). Pero acá la
+    conexion real se reusa entre pedidos HTTP para no pagar el handshake de
+    Oracle (Native Network Encryption) en cada uno — asi que `__exit__` NO
+    cierra la conexion real, solo la deja disponible para el proximo `with`.
+    El cierre real pasa unicamente si se detecta rota (ver `get_connection`)
+    o al terminar el proceso (`_close_all`).
+    """
+
+    def __init__(self, conn: oracledb.Connection):
+        self._conn = conn
+
+    def cursor(self):
+        return self._conn.cursor()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+_connections: dict[str, oracledb.Connection] = {}
+_conn_lock = threading.Lock()
+
+
+def get_connection(env_key: str) -> _PooledConnection:
+    """Abre (o reusa) el tunel Y la conexion Oracle del ambiente.
+
+    La conexion se cachea por ambiente y se revalida con `ping()` antes de
+    reusarla; si esta rota (idle timeout, corte de red) se descarta y se abre
+    una nueva de forma transparente.
+    """
     if not DB_PASSWORD:
         raise RuntimeError("DB_PASSWORD no esta configurado en .env.")
     env = get_environment(env_key)
     _init_thick_mode()
     _get_tunnel(env)
-    dsn = oracledb.makedsn("localhost", env["local_port"], service_name=env["service_name"])
-    return oracledb.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        dsn=dsn,
-        tcp_connect_timeout=DB_CONNECT_TIMEOUT,
-    )
+
+    with _conn_lock:
+        conn = _connections.get(env["key"])
+        if conn is not None:
+            try:
+                conn.ping()
+                return _PooledConnection(conn)
+            except oracledb.Error:
+                try:
+                    conn.close()
+                except oracledb.Error:
+                    pass
+                _connections.pop(env["key"], None)
+
+        dsn = oracledb.makedsn("localhost", env["local_port"], service_name=env["service_name"])
+        conn = oracledb.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            dsn=dsn,
+            tcp_connect_timeout=DB_CONNECT_TIMEOUT,
+        )
+        _connections[env["key"]] = conn
+        return _PooledConnection(conn)
 
 
 @atexit.register
 def _close_all() -> None:
     for tunnel in _tunnels.values():
         tunnel.close()
+    for conn in _connections.values():
+        try:
+            conn.close()
+        except oracledb.Error:
+            pass

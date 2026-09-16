@@ -13,28 +13,42 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
    se pensó explícitamente; `Car_Mul_V3` hoy solo está desplegado en
    SIT/PREPROD, ver "Limitaciones conocidas"), arriba
    de todo, porque lo usan tanto la búsqueda de insumos como la ejecución.
-2. Para conseguir casos de prueba (pólizas reales) hay dos caminos, según la
-   familia de imprimible:
+2. Para conseguir casos de prueba (pólizas reales), la sección "Insumos"
+   tiene dos pestañas independientes (más el camino de `Car_Mul`):
    - **Car_Mul / Car_Mul_V3** (multinciso): `/cases` (`list_mul_cases` en
-     `cases.py`) arma la tanda leyendo `INSOR_GDS.CAR_MUL_VIEW`.
-   - **Car_Ind / Cot_Ind** (u otras familias "individuales"): el segmento
-     "Insumos: buscar pólizas por producto" deja elegir Familia + Producto +
-     Subtipo y llama a `/policy_cases` (`list_policy_cases`), que filtra
-     `insis_gen_v10.policy` por `policy_state` (según la familia) y
-     `insr_type` (el `product_code` elegido). `/products` (`list_products`)
-     trae el catálogo producto/subtipo → `product_code` desde
-     `cfg_nl_product`/`cfg_nl_product_text` (la query se la pasó el usuario
-     directamente — es la que usa el equipo para resolver nombres de
-     producto; ver detalle en `cases.py`).
+     `cases.py`) arma la tanda leyendo `INSOR_GDS.CAR_MUL_VIEW` — no vive en
+     "Insumos", tiene su propio buscador en "Configuración de la comparación"
+     porque su elegibilidad depende de esa vista, no de producto/estado.
+   - **"Por producto"** (Car_Ind/Cot_Ind u otras familias "individuales"):
+     elegís Familia + Producto + Subtipo y llama a `/policy_cases`
+     (`list_policy_cases`), que filtra `insis_gen_v10.policy` por
+     `policy_state` (según la familia) y `insr_type` (el `product_code`
+     elegido). `/products` (`list_products`) trae el catálogo
+     producto/subtipo → `product_code` desde `cfg_nl_product`/
+     `cfg_nl_product_text` (la query se la pasó el usuario directamente — es
+     la que usa el equipo para resolver nombres de producto; ver detalle en
+     `cases.py`).
+   - **"Por identificador"**: pegás un `policy_id`/`policy_no`/`policy_lot`/
+     `engagement_id`/`quote_id` y llama a `/resolve_policy` (`resolver.py`),
+     que es el mismo buscador de `generar-imprimibles` (`policy.py` +
+     `resolve_engagement`/`resolve_quote` de `imprimibles.py`) copiado sin el
+     motor de elegibilidad de imprimibles — acá solo interesa identificar la
+     póliza, no calcular qué reportes ofrecerle. Si el valor resuelve a un
+     `engagement_id` (autos multinciso), `list_engagement_policies` trae
+     **todas** las pólizas dependientes de ese engagement (no solo las
+     MASTER en estado 0 que usa `_masters` en `imprimibles.py` para la
+     caratula — acá interesa listar lo que hay, no decidir elegibilidad de
+     un reporte puntual), con su `eng_pol_type` (`MASTER`/`DEPENDENT`,
+     confirmado contra un engagement real en SIT).
 
-   **"Insumos" es semánticamente independiente de la comparación**, aunque
-   internamente reuse la misma tanda de datos para no duplicar la consulta:
-   busca pólizas para *conocerlas* (con `policy_id`, `policy_no`,
-   `policy_lot`, `insr_type`, `policy_state`, y `quote_id` si aplica) y las
-   muestra en su propia tabla ("Pólizas encontradas"), sin tocar la sección
-   de comparación. Solo si el usuario aprieta explícitamente "Usar estas
-   pólizas como casos de prueba" esa tanda pasa a ser `cases` y aparece en
-   "Casos de prueba" — nunca como efecto automático de buscar.
+   Ambas pestañas de "Insumos" alimentan la misma tabla "Pólizas encontradas"
+   y son **semánticamente independientes de la comparación**, aunque
+   internamente reusen la misma tanda de datos para no duplicar la consulta:
+   buscan pólizas para *conocerlas* (con `policy_id`, `policy_no`,
+   `policy_lot`, `insr_type`, `policy_state`, y `quote_id` si aplica), sin
+   tocar la sección de comparación. Solo si el usuario aprieta explícitamente
+   "Usar estas pólizas como casos de prueba" esa tanda pasa a ser `cases` y
+   aparece en "Casos de prueba" — nunca como efecto automático de buscar.
 
    Cualquiera sea el origen, cada caso trae un campo `params` ya armado con
    la forma exacta que espera OIC para esa familia (`[policy_id, annex_id]`
@@ -75,9 +89,18 @@ la vista puede tardar varios segundos, el default de casos es chico (5).
 ## Archivos clave
 
 - `app.py` — rutas Flask: `/`, `/cases`, `/products`, `/policy_cases`,
-  `/run_case`, `/pdf/<token>`.
+  `/resolve_policy`, `/run_case`, `/pdf/<token>`.
 - `cases.py` — descubrimiento de casos (`list_mul_cases`, `list_products`,
   `list_policy_cases`), ver arriba.
+- `resolver.py` — buscador por identificador (`resolve`, con `lookup_policy`
+  + `resolve_engagement`/`resolve_quote`), copiado de
+  `generar-imprimibles/policy.py` + las dos funciones homónimas de
+  `imprimibles.py` (sin el resto del motor de elegibilidad). Ojo: a
+  diferencia del original, acá `_serialize` sí convierte `Decimal` a
+  `int`/`float` — el original de `generar-imprimibles` no lo hace, así que
+  si esa app alguna vez devuelve `Decimal` desde Oracle para estas columnas,
+  tiene el mismo bug latente de `jsonify` (no se tocó ese proyecto, pero
+  vale la pena avisar si se retoca).
 - `reports.py` — llamada al flujo OIC JASPER_INSOR (`fetch_report`), nombre
   de reporte libre (sin catálogo).
 - `compare.py` — extrae texto de cada PDF (pdfplumber) y arma el diff
@@ -89,6 +112,19 @@ la vista puede tardar varios segundos, el default de casos es chico (5).
   correr las tres apps a la vez. No trae copia propia de la clave SSH ni del
   Instant Client: `.env` apunta con rutas relativas a los de
   `generar-imprimibles` (`SSH_KEY_PATH`, `ORACLE_CLIENT_LIB`).
+
+  **A diferencia del original de `generar-imprimibles`**, acá `get_connection`
+  también cachea y reusa la conexión Oracle en sí (no solo el túnel SSH) por
+  ambiente, para no pagar el handshake de Native Network Encryption en cada
+  pedido HTTP — medido: ~4s la primera vez, ~0.3s las siguientes. Devuelve un
+  `_PooledConnection` cuyo `__exit__` NO cierra la conexión real (a
+  diferencia de una `oracledb.Connection` normal) — todo el código llamador
+  sigue escribiendo `with get_connection(env) as conn:` exactamente igual,
+  no hace falta que lo sepa. Antes de reusarla hace `conn.ping()`; si está
+  rota (idle timeout, corte de red) la descarta y reconecta sola. El cierre
+  real solo pasa si `ping()` falla o al terminar el proceso (`_close_all`).
+  Si se vuelve a copiar este `db.py` a otra app hermana, decidir a
+  propósito si también quiere este pooling o el original sin cachear.
 - `templates/index.html` — frontend único, reutiliza los tokens de diseño
   (colores, pills, tabla de diff) de `versiones-vistas-imprimibles`.
 

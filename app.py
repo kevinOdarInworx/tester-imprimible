@@ -7,6 +7,9 @@
   de la busqueda por producto (Car_Ind/Cot_Ind).
 - /policy_cases: arma una tanda de casos para Car_Ind/Cot_Ind filtrando
   insis_gen_v10.policy por estado + producto.
+- /resolve_policy: busca una poliza por policy_id/policy_no/policy_lot/
+  engagement_id/quote_id (el mismo buscador de generar-imprimibles, ver
+  resolver.py), para la otra forma de conseguir insumos.
 - /run_case: para un caso, pide el PDF a ambos reportes via OIC (reports.py),
   mide cuanto tarda cada uno y diffea el texto extraido (compare.py).
 - /pdf/<token>: sirve el PDF de una corrida anterior (para verlo/descargarlo).
@@ -26,6 +29,7 @@ from cases import FAMILIES, list_mul_cases, list_policy_cases, list_products
 from compare import compare_pdfs
 from config.environments import ENVIRONMENTS
 from reports import OIC_PASSWORD, fetch_report
+from resolver import resolve as resolve_policy
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -101,6 +105,46 @@ def policy_cases_route():
     except Exception as exc:  # tunel / conexion / oracle
         return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
     return jsonify({"cases": cases})
+
+
+@app.route("/resolve_policy", methods=["POST"])
+def resolve_policy_route():
+    data = request.get_json(silent=True) or {}
+    env = data.get("env", "")
+    policy = data.get("policy", "")
+    if env not in ENVIRONMENTS:
+        return jsonify({"error": "Ambiente invalido."}), 400
+    try:
+        result = resolve_policy(env, policy)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # tunel / conexion / oracle
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
+
+    # Mismo formato de caso que /cases y /policy_cases, para reusar tal cual
+    # la tabla "Pólizas encontradas" y el traspaso a "Casos de prueba".
+    # eng_pol_type solo viene poblado cuando el match salio de resolver un
+    # engagement_id (ver list_engagement_policies en resolver.py).
+    cases = [
+        {
+            "policy_id": m.get("policy_id"),
+            "policy_no": m.get("policy_no"),
+            "policy_lot": m.get("policy_lot"),
+            "insr_type": m.get("insr_type"),
+            "policy_state": m.get("policy_state"),
+            "quote_id": None,
+            "eng_pol_type": m.get("eng_pol_type"),
+            "annex_id": 0,
+            "no_poliza": m.get("policy_no"),
+            "params": [m.get("policy_id"), 0],
+        }
+        for m in result.get("matches", [])
+    ]
+    return jsonify({
+        "cases": cases,
+        "engagement_id": result.get("engagement_id"),
+        "quote_id": result.get("quote_id"),
+    })
 
 
 @app.route("/run_case", methods=["POST"])

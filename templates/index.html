@@ -172,6 +172,12 @@
     .banner-icon { width: 24px; height: 24px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
     .banner.ok .banner-icon { background: var(--ok); }
     .banner.bad .banner-icon { background: var(--bad); }
+
+    .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--border); }
+    .tab-btn { background: none; color: var(--text-muted); box-shadow: none; padding: 10px 4px; border-radius: 0; font-weight: 600; position: relative; margin-right: 18px; }
+    .tab-btn:hover:not(:disabled) { background: none; color: var(--text); }
+    .tab-btn.active { color: var(--primary); }
+    .tab-btn.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--primary); border-radius: 2px; }
   </style>
 </head>
 <body>
@@ -197,36 +203,52 @@
     </div>
 
     <div class="card">
-      <h2>Insumos: buscar pólizas por producto</h2>
-      <div class="config-grid">
-        <div>
-          <label for="prFamily">Familia</label>
-          <select id="prFamily">
-            <option value="Car_Ind">Car_Ind (póliza emitida)</option>
-            <option value="Cot_Ind">Cot_Ind (cotización)</option>
-          </select>
-        </div>
-        <div class="dropdown" id="prProductoDD">
-          <label>Producto</label>
-          <button type="button" class="dropdown-toggle">Elegí un producto…</button>
-          <div class="dropdown-menu"></div>
-          <input type="hidden" id="prProducto" />
-        </div>
-        <div class="dropdown" id="prSubtipoDD">
-          <label>Subtipo</label>
-          <button type="button" class="dropdown-toggle">—</button>
-          <div class="dropdown-menu"></div>
-          <input type="hidden" id="prSubtipo" />
-        </div>
-        <div>
-          <label for="prLimit">Cantidad</label>
-          <input id="prLimit" type="number" value="5" min="1" max="30" />
-        </div>
+      <h2>Insumos: buscar pólizas</h2>
+      <div class="tabs" style="margin-bottom:18px">
+        <button class="tab-btn active" id="tabBtnProducto" type="button">Por producto</button>
+        <button class="tab-btn" id="tabBtnIdentificador" type="button">Por identificador</button>
       </div>
-      <div style="margin-top:14px">
-        <button id="btnBuscarPolizas">Buscar pólizas</button>
+
+      <div id="panelProducto">
+        <div class="config-grid">
+          <div>
+            <label for="prFamily">Familia</label>
+            <select id="prFamily">
+              <option value="Car_Ind">Car_Ind (póliza emitida)</option>
+              <option value="Cot_Ind">Cot_Ind (cotización)</option>
+            </select>
+          </div>
+          <div class="dropdown" id="prProductoDD">
+            <label>Producto</label>
+            <button type="button" class="dropdown-toggle">Elegí un producto…</button>
+            <div class="dropdown-menu"></div>
+            <input type="hidden" id="prProducto" />
+          </div>
+          <div class="dropdown" id="prSubtipoDD">
+            <label>Subtipo</label>
+            <button type="button" class="dropdown-toggle">—</button>
+            <div class="dropdown-menu"></div>
+            <input type="hidden" id="prSubtipo" />
+          </div>
+          <div>
+            <label for="prLimit">Cantidad</label>
+            <input id="prLimit" type="number" value="5" min="1" max="30" />
+          </div>
+        </div>
+        <div style="margin-top:14px">
+          <button id="btnBuscarPolizas">Buscar pólizas</button>
+        </div>
+        <div class="hint" id="prHint">El producto/subtipo sale del catálogo de configuración (cfg_nl_product); Car_Ind pide pólizas emitidas (policy_state ≥ 1), Cot_Ind pide cotizaciones (policy_state = -4) con quote_id resuelto. Esto es solo para conocer pólizas reales de un producto — no ejecuta nada por sí solo.</div>
       </div>
-      <div class="hint" id="prHint">El producto/subtipo sale del catálogo de configuración (cfg_nl_product); Car_Ind pide pólizas emitidas (policy_state ≥ 1), Cot_Ind pide cotizaciones (policy_state = -4) con quote_id resuelto. Esto es solo para conocer pólizas reales de un producto — no ejecuta nada por sí solo.</div>
+
+      <div id="panelIdentificador" style="display:none">
+        <label for="polIdent">Póliza (policy_id, policy_no, policy_lot, engagement_id o quote_id)</label>
+        <div style="display:flex; gap:10px; align-items:flex-start;">
+          <div style="flex:1"><input id="polIdent" placeholder="Ej: 132510 | 06/956/132510 | 100000225422 | 0600201107/0135867/00" autocomplete="off" /></div>
+          <button id="btnResolverPoliza">Resolver póliza</button>
+        </div>
+        <div class="hint" id="polHint">Mismo buscador que generar-imprimibles: prueba policy_id/policy_no/policy_lot directo, y si no encuentra nada, si es un engagement_id de autos multinciso o un quote_id de cotización. Tampoco ejecuta nada por sí solo.</div>
+      </div>
     </div>
 
     <div class="card" id="prResultsCard" style="display:none">
@@ -241,6 +263,7 @@
               <th data-sort="insr_type" data-type="num">INSR_TYPE</th>
               <th data-sort="policy_state" data-type="num">Policy State</th>
               <th data-sort="quote_id" data-type="num">Quote ID</th>
+              <th data-sort="eng_pol_type" data-type="str">Tipo (engagement)</th>
             </tr>
           </thead>
           <tbody id="prResultsBody"></tbody>
@@ -310,6 +333,57 @@
     const btnBuscarPolizas = $("btnBuscarPolizas"), prHint = $("prHint");
     const prResultsCard = $("prResultsCard"), prResultsBody = $("prResultsBody"), btnUsarPolizas = $("btnUsarPolizas");
     const prResultsHead = $("prResultsHead");
+    const tabBtnProducto = $("tabBtnProducto"), tabBtnIdentificador = $("tabBtnIdentificador");
+    const panelProducto = $("panelProducto"), panelIdentificador = $("panelIdentificador");
+    const polIdent = $("polIdent"), btnResolverPoliza = $("btnResolverPoliza"), polHint = $("polHint");
+
+    tabBtnProducto.addEventListener("click", () => switchInsumosTab("producto"));
+    tabBtnIdentificador.addEventListener("click", () => switchInsumosTab("identificador"));
+    function switchInsumosTab(which) {
+      const isProducto = which === "producto";
+      panelProducto.style.display = isProducto ? "block" : "none";
+      panelIdentificador.style.display = isProducto ? "none" : "block";
+      tabBtnProducto.classList.toggle("active", isProducto);
+      tabBtnIdentificador.classList.toggle("active", !isProducto);
+    }
+
+    btnResolverPoliza.addEventListener("click", resolverPoliza);
+    polIdent.addEventListener("keydown", (e) => { if (e.key === "Enter") resolverPoliza(); });
+
+    async function resolverPoliza() {
+      const value = polIdent.value.trim();
+      if (!value) { polHint.innerHTML = '<span class="error">Ingresá un identificador.</span>'; return; }
+      btnResolverPoliza.disabled = true; btnResolverPoliza.textContent = "Resolviendo…";
+      prResultsCard.style.display = "none";
+      polHint.innerHTML = '<span class="spinner"></span> Consultando (tunel SSH + Oracle, puede tardar)…';
+      try {
+        const res = await fetch("/resolve_policy", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ env: envEl.value, policy: value }),
+        });
+        const data = await res.json();
+        if (!res.ok) { polHint.innerHTML = '<span class="error">' + (data.error || "Error") + '</span>'; return; }
+        policyResults = data.cases || [];
+        policyResultsSource = "identificador";
+        if (!policyResults.length) {
+          polHint.innerHTML = data.engagement_id
+            ? `<span class="error">Es un engagement_id de autos multinciso (<strong>${data.engagement_id}</strong>) pero no tiene pólizas dependientes.</span>`
+            : '<span class="error">No se encontró ninguna póliza con ese identificador.</span>';
+          return;
+        }
+        polHint.textContent = data.engagement_id
+          ? `Es un engagement_id de autos multinciso (${data.engagement_id}): ${policyResults.length} póliza(s) dependientes.`
+          : data.quote_id
+          ? `Resuelto por quote_id ${data.quote_id}: ${policyResults.length} póliza(s) encontradas.`
+          : `${policyResults.length} póliza(s) encontradas.`;
+        renderPolicyResults();
+        prResultsCard.style.display = "block";
+      } catch (err) {
+        polHint.innerHTML = '<span class="error">Error de red: ' + err + '</span>';
+      } finally {
+        btnResolverPoliza.disabled = false; btnResolverPoliza.textContent = "Resolver póliza";
+      }
+    }
 
     let prSort = { key: null, dir: 1 }; // dir: 1 asc, -1 desc
 
@@ -324,7 +398,8 @@
     });
 
     let cases = []; // [{policy_id, annex_id, no_poliza, cant_ubicaciones, params, ...}]
-    let policyResults = []; // ultima tanda de /policy_cases (informativo, ver btnUsarPolizas)
+    let policyResults = []; // ultima tanda de /policy_cases o /resolve_policy (informativo, ver btnUsarPolizas)
+    let policyResultsSource = null; // "producto" | "identificador" — de donde salio policyResults
     let products = []; // [{product_code, product_text, subtipo}]
     let productsLoadedFor = null; // ambiente para el que ya se cargo el catalogo
     let selectedProductCodes = []; // codigos a usar en /policy_cases (uno, o varios si es "Todos")
@@ -483,6 +558,7 @@
         const data = await res.json();
         if (!res.ok) { prHint.innerHTML = '<span class="error">' + (data.error || "Error") + '</span>'; return; }
         policyResults = data.cases || [];
+        policyResultsSource = "producto";
         if (!policyResults.length) {
           prHint.innerHTML = '<span class="error">No se encontraron pólizas para ese producto/estado.</span>';
           return;
@@ -524,6 +600,7 @@
           <td>${p.insr_type ?? "—"}</td>
           <td>${p.policy_state ?? "—"}</td>
           <td>${p.quote_id ?? "—"}</td>
+          <td>${p.eng_pol_type ?? "—"}</td>
         </tr>
       `).join("");
     }
@@ -533,7 +610,7 @@
       // datos de policy), no dispara la comparación por si sola. Recien acá
       // se decide usarlas como casos de prueba.
       cases = policyResults;
-      reportAEl.value = prFamily.value;
+      if (policyResultsSource === "producto") reportAEl.value = prFamily.value;
       renderCases();
       casesCard.style.display = "block";
       btnRun.disabled = false;
