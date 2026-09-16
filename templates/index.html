@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tester de imprimibles</title>
+  <style>
+    :root {
+      --bg: #eef1f6;
+      --surface: #ffffff;
+      --surface-2: #f5f7fb;
+      --border: #e3e7ee;
+      --text: #161a23;
+      --text-muted: #66707e;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-soft: #eef0ff;
+      --ok: #05966e; --ok-bg: #e9fbf3; --ok-bd: #a7ecc9;
+      --bad: #d92d20; --bad-bg: #fef2f1; --bad-bd: #fecdca;
+      --warn: #b54708; --warn-bg: #fff7ed; --warn-bd: #fed7aa;
+      --miss: #94a0b3;
+      --diff-add-bg: #dcfbe4; --diff-add-bd: #86e0a4; --diff-add-row: #f0fdf5;
+      --diff-sub-bg: #ffdcda; --diff-sub-bd: #f3a8a2; --diff-sub-row: #fef4f3;
+      --diff-chg-bg: #fdedad; --diff-chg-bd: #f0d264; --diff-chg-row: #fffbef;
+      --radius: 14px;
+      --radius-sm: 9px;
+      --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 6px 20px -4px rgba(16, 24, 40, .10);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #23262e; --surface: #2c303a; --surface-2: #343945; --border: #454b59;
+        --text: #e7e9ee; --text-muted: #a4abb9;
+        --primary: #918dfb; --primary-hover: #aca8fc; --primary-soft: #383a5c;
+        --ok: #4ddba3; --ok-bg: #30463e; --ok-bd: #3f6b58;
+        --bad: #fa8c83; --bad-bg: #4a3230; --bad-bd: #6e433f;
+        --warn: #f0b866; --warn-bg: #453620; --warn-bd: #6e5432;
+        --miss: #8891a1;
+        --diff-add-bg: rgba(46, 194, 108, .38); --diff-add-bd: rgba(58, 214, 122, .8); --diff-add-row: rgba(46, 194, 108, .14);
+        --diff-sub-bg: rgba(248, 81, 73, .35); --diff-sub-bd: rgba(248, 100, 92, .75); --diff-sub-row: rgba(248, 81, 73, .14);
+        --diff-chg-bg: rgba(230, 179, 33, .35); --diff-chg-bd: rgba(230, 190, 60, .75); --diff-chg-row: rgba(230, 179, 33, .13);
+        --shadow: 0 1px 2px rgba(0, 0, 0, .25), 0 8px 20px -6px rgba(0, 0, 0, .35);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, "Segoe UI", Arial, sans-serif; margin: 0; min-height: 100vh;
+      background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 20px 72px; }
+
+    header.top { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+    .logo { width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, var(--primary), #8b7ef8); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; box-shadow: var(--shadow); }
+    h1 { font-size: 21px; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+    p.sub { margin: 3px 0 0; color: var(--text-muted); font-size: 13.5px; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; margin-bottom: 18px; box-shadow: var(--shadow); animation: fadeIn .35s ease; }
+    h2 { font-size: 14.5px; font-weight: 700; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+
+    label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 7px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
+    input, select {
+      width: 100%; padding: 11px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 14px; background: var(--surface-2); color: var(--text); transition: border-color .15s, box-shadow .15s, background .15s;
+    }
+    input:focus, select:focus {
+      outline: none; border-color: var(--primary); background: var(--surface);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+    }
+    select {
+      appearance: none; -webkit-appearance: none; padding-right: 36px; cursor: pointer;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2366707e' stroke-width='1.6'><path d='M6 8l4 4 4-4' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+      background-repeat: no-repeat; background-position: right 12px center; background-size: 14px;
+    }
+
+    .config-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 120px; gap: 12px; align-items: end; }
+
+    button {
+      background: var(--primary); color: #fff; border: 0; padding: 11px 20px; border-radius: var(--radius-sm);
+      font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .15s, transform .1s, box-shadow .15s;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, .08);
+    }
+    button.secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+    button.secondary:hover:not(:disabled) { background: var(--border); }
+    button:hover:not(:disabled) { background: var(--primary-hover); }
+    button:active:not(:disabled) { transform: translateY(1px); }
+    button:disabled { opacity: .55; cursor: default; }
+    button.linklike { background: none; box-shadow: none; color: var(--primary); padding: 2px 0; font-weight: 600; font-size: 12.5px; }
+    button.linklike:hover:not(:disabled) { background: none; text-decoration: underline; }
+
+    .hint { font-size: 12.5px; color: var(--text-muted); margin-top: 10px; min-height: 16px; }
+    .error { color: var(--bad); font-size: 14px; font-weight: 500; }
+    .muted { color: var(--text-muted); font-size: 13px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, "Courier New", monospace; font-size: 12px; white-space: nowrap; }
+
+    table.cases { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .cases-wrap { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+    table.cases th, table.cases td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    table.cases tbody tr:last-child td { border-bottom: 0; }
+    table.cases th { background: var(--surface-2); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: var(--text-muted); }
+    table.cases tbody tr:hover { background: var(--surface-2); }
+    table.cases td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    table.cases input[type=checkbox] { width: auto; }
+
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 600; border: 1px solid transparent; }
+    .pill-ok { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-bd); }
+    .pill-bad { background: var(--bad-bg); color: var(--bad); border-color: var(--bad-bd); }
+    .pill-warn { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-bd); }
+    .pill-miss { background: var(--surface-2); color: var(--miss); border-color: var(--border); }
+
+    .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .stats { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+    .badge { background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; font-size: 12.5px; }
+    .badge strong { color: var(--text); }
+
+    .diff-row td { background: var(--surface-2); padding: 14px; }
+    .difftable-wrap { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: auto; max-height: 60vh; }
+    table.diff { table-layout: fixed; border-collapse: collapse; width: 100%; font-family: ui-monospace, SFMono-Regular, Consolas, "Courier New", monospace; font-size: 12.5px; background: var(--surface); }
+    table.diff colgroup:nth-child(1), table.diff colgroup:nth-child(4) { width: 22px; }
+    table.diff colgroup:nth-child(2), table.diff colgroup:nth-child(5) { width: 42px; }
+    table.diff thead th.diff_header { position: sticky; top: 0; z-index: 1; background: var(--primary); color: #fff; font-weight: 600; text-align: left; padding: 9px 12px; font-family: system-ui, "Segoe UI", Arial, sans-serif; font-size: 12.5px; }
+    table.diff thead th.diff_next { position: sticky; top: 0; z-index: 1; background: var(--primary); }
+    table.diff tbody td { padding: 3px 10px; vertical-align: top; }
+    table.diff tbody td.diff_header { background: var(--surface-2); color: var(--miss); text-align: right; user-select: none; border-right: 1px solid var(--border); white-space: nowrap; }
+    table.diff tbody td.diff_next { text-align: center; width: 20px; }
+    table.diff tbody td.diff_next a { color: var(--miss); text-decoration: none; font-size: 10px; }
+    table.diff tbody td[nowrap] { white-space: pre-wrap; overflow-wrap: anywhere; }
+    table.diff tbody tr:has(.diff_sub) td:nth-child(3) { background: var(--diff-sub-row); }
+    table.diff tbody tr:has(.diff_add) td:nth-child(6) { background: var(--diff-add-row); }
+    table.diff tbody tr:has(.diff_chg) td:nth-child(3) { background: var(--diff-sub-row); }
+    table.diff tbody tr:has(.diff_chg) td:nth-child(6) { background: var(--diff-add-row); }
+    table.diff .diff_add { background: var(--diff-add-bg); border: 1px solid var(--diff-add-bd); border-radius: 3px; }
+    table.diff .diff_sub { background: var(--diff-sub-bg); border: 1px solid var(--diff-sub-bd); border-radius: 3px; }
+    table.diff .diff_chg { background: var(--diff-chg-bg); border: 1px solid var(--diff-chg-bd); border-radius: 3px; }
+    table.diff tbody tr:has(> td.diff_header:empty) { background: var(--surface-2); }
+    table.diff tbody tr:has(> td.diff_header:empty) td.diff_header { background: var(--border); }
+    table.diff tbody + tbody tr:first-child td { border-top: 2px dashed var(--border); padding-top: 12px; }
+
+    .banner { border-radius: var(--radius-sm); padding: 13px 16px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+    .banner.ok { background: var(--ok-bg); border: 1px solid var(--ok-bd); color: var(--ok); }
+    .banner.bad { background: var(--bad-bg); border: 1px solid var(--bad-bd); color: var(--bad); }
+    .banner-icon { width: 24px; height: 24px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+    .banner.ok .banner-icon { background: var(--ok); }
+    .banner.bad .banner-icon { background: var(--bad); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div class="logo">🧪</div>
+      <div>
+        <h1>Tester de imprimibles</h1>
+        <p class="sub">Compara dos versiones del mismo imprimible (p.ej. Car_Mul vs Car_Mul_V3) sobre pólizas reales: mismo contenido, tiempos distintos.</p>
+      </div>
+    </header>
+
+    <div class="card">
+      <h2>Configuración</h2>
+      <div class="config-grid">
+        <div>
+          <label for="env">Ambiente</label>
+          <select id="env">
+            {% for e in environments %}<option value="{{ e.key }}" {% if e.key == 'SIT' %}selected{% endif %}>{{ e.label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="reportA">Reporte A (base)</label>
+          <input id="reportA" value="Car_Mul" autocomplete="off" />
+        </div>
+        <div>
+          <label for="reportB">Reporte B (a validar)</label>
+          <input id="reportB" value="Car_Mul_V3" autocomplete="off" />
+        </div>
+        <div>
+          <label for="limit">Casos</label>
+          <input id="limit" type="number" value="5" min="1" max="30" />
+        </div>
+      </div>
+      <div style="margin-top:14px; display:flex; gap:10px;">
+        <button id="btnBuscar">Buscar casos en CAR_MUL_VIEW</button>
+        <button id="btnRun" class="secondary" disabled>Ejecutar comparación</button>
+      </div>
+      <div class="hint" id="hint">Los casos salen de INSOR_GDS.CAR_MUL_VIEW, filtrados siempre por POLICY_ID (la vista es cara sin filtro), así que buscar casos puede tardar varios segundos por candidato. Por defecto se prueba en SIT/PREPROD porque es donde Car_Mul_V3 está desplegado hoy.</div>
+    </div>
+
+    <div class="card" id="casesCard" style="display:none">
+      <h2>Casos de prueba</h2>
+      <div class="stats" id="runStats"></div>
+      <div class="cases-wrap">
+        <table class="cases">
+          <thead>
+            <tr>
+              <th style="width:30px"><input type="checkbox" id="checkAll" checked /></th>
+              <th>Póliza</th>
+              <th>Endoso</th>
+              <th>Parámetros OIC</th>
+              <th class="num">Ubicaciones</th>
+              <th>Estado</th>
+              <th>Orden</th>
+              <th class="num">Tiempo A</th>
+              <th class="num">Tiempo B</th>
+              <th class="num">Mejora</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="casesBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const envEl = $("env"), reportAEl = $("reportA"), reportBEl = $("reportB"), limitEl = $("limit");
+    const btnBuscar = $("btnBuscar"), btnRun = $("btnRun"), hintEl = $("hint");
+    const casesCard = $("casesCard"), casesBody = $("casesBody"), checkAll = $("checkAll"), runStats = $("runStats");
+
+    let cases = []; // [{policy_id, annex_id, no_poliza, nombre_cliente, cant_ubicaciones}]
+
+    btnBuscar.addEventListener("click", buscarCasos);
+    btnRun.addEventListener("click", ejecutar);
+    checkAll.addEventListener("change", () => {
+      casesBody.querySelectorAll(".rowCheck").forEach(cb => cb.checked = checkAll.checked);
+    });
+
+    async function buscarCasos() {
+      btnBuscar.disabled = true; btnBuscar.textContent = "Buscando…";
+      btnRun.disabled = true;
+      casesCard.style.display = "none";
+      hintEl.innerHTML = "Consultando candidatos y filtrando por CAR_MUL_VIEW (puede tardar)…";
+      try {
+        const res = await fetch("/cases", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ env: envEl.value, limit: parseInt(limitEl.value || "5", 10) }),
+        });
+        const data = await res.json();
+        if (!res.ok) { hintEl.innerHTML = '<span class="error">' + (data.error || "Error") + '</span>'; return; }
+        cases = data.cases || [];
+        if (!cases.length) {
+          hintEl.innerHTML = '<span class="error">No se encontraron casos en CAR_MUL_VIEW para los candidatos probados.</span>';
+          return;
+        }
+        hintEl.textContent = `${cases.length} caso(s) encontrados.`;
+        renderCases();
+        casesCard.style.display = "block";
+        btnRun.disabled = false;
+      } catch (err) {
+        hintEl.innerHTML = '<span class="error">Error de red: ' + err + '</span>';
+      } finally {
+        btnBuscar.disabled = false; btnBuscar.textContent = "Buscar casos en CAR_MUL_VIEW";
+      }
+    }
+
+    function renderCases() {
+      runStats.innerHTML = "";
+      casesBody.innerHTML = cases.map((c, i) => `
+        <tr data-idx="${i}">
+          <td><input type="checkbox" class="rowCheck" checked /></td>
+          <td>${c.no_poliza || c.policy_id}</td>
+          <td>${c.annex_id ?? 0}</td>
+          <td class="mono muted">string_param1=${c.policy_id} · string_param2=${c.annex_id ?? 0}</td>
+          <td class="num">${c.cant_ubicaciones ?? "—"}</td>
+          <td class="statusCell"><span class="pill pill-miss">pendiente</span></td>
+          <td class="orderCell muted">—</td>
+          <td class="num timeA">—</td>
+          <td class="num timeB">—</td>
+          <td class="num speedup">—</td>
+          <td class="diffCell"></td>
+        </tr>
+      `).join("");
+    }
+
+    function fmtTime(s) {
+      if (s == null) return "—";
+      return s.toFixed(2) + "s";
+    }
+
+    async function ejecutar() {
+      btnRun.disabled = true; btnRun.textContent = "Ejecutando…";
+      btnBuscar.disabled = true;
+      const rows = [...casesBody.querySelectorAll("tr")].filter(tr => tr.querySelector(".rowCheck").checked);
+      let ok = 0, bad = 0, err = 0;
+      let speedups = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const tr = rows[i];
+        const idx = parseInt(tr.dataset.idx, 10);
+        const c = cases[idx];
+        const statusCell = tr.querySelector(".statusCell");
+        statusCell.innerHTML = '<span class="spinner"></span> ejecutando…';
+        try {
+          // Alternar quién se pide primero: el primero de los dos se beneficia
+          // del buffer cache de Oracle que deja tibio el segundo (misma poliza),
+          // asi que siempre pedir A primero infla artificialmente la mejora de B.
+          const res = await fetch("/run_case", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              env: envEl.value, report_a: reportAEl.value.trim(), report_b: reportBEl.value.trim(),
+              params: [c.policy_id, c.annex_id], swap_order: (i % 2 === 1),
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) { statusCell.innerHTML = `<span class="pill pill-bad">✕ ${data.error || "error"}</span>`; err++; continue; }
+          renderRowResult(tr, data);
+          if (!data.a.ok || !data.b.ok) { err++; }
+          else if (data.diff && data.diff.error) { err++; }
+          else if (data.diff && data.diff.identical) { ok++; if (data.a.elapsed && data.b.elapsed) speedups.push(data.a.elapsed / data.b.elapsed); }
+          else { bad++; }
+        } catch (e) {
+          statusCell.innerHTML = `<span class="pill pill-bad">✕ error de red</span>`;
+          err++;
+        }
+        renderStats(ok, bad, err, rows.length, speedups);
+      }
+
+      btnRun.disabled = false; btnRun.textContent = "Ejecutar comparación";
+      btnBuscar.disabled = false;
+    }
+
+    function renderStats(ok, bad, err, total, speedups) {
+      const avg = speedups.length ? (speedups.reduce((a, b) => a + b, 0) / speedups.length) : null;
+      runStats.innerHTML =
+        `<span class="badge">Corridos: <strong>${ok + bad + err}/${total}</strong></span>` +
+        `<span class="badge">Idénticos: <strong>${ok}</strong></span>` +
+        (bad ? `<span class="badge" style="color:var(--bad)">Distintos: <strong>${bad}</strong></span>` : "") +
+        (err ? `<span class="badge" style="color:var(--warn)">Errores: <strong>${err}</strong></span>` : "") +
+        (avg ? `<span class="badge">Mejora promedio: <strong>${avg.toFixed(1)}×</strong></span>` : "");
+    }
+
+    function renderRowResult(tr, data) {
+      const { a, b, diff, order } = data;
+      tr.querySelector(".orderCell").textContent = (order || []).map(s => s.toUpperCase()).join("→");
+      tr.querySelector(".timeA").textContent = a.ok ? fmtTime(a.elapsed) : "—";
+      tr.querySelector(".timeB").textContent = b.ok ? fmtTime(b.elapsed) : "—";
+      tr.querySelector(".speedup").textContent = (a.ok && b.ok && a.elapsed && b.elapsed) ? (a.elapsed / b.elapsed).toFixed(1) + "×" : "—";
+
+      const statusCell = tr.querySelector(".statusCell");
+      const diffCell = tr.querySelector(".diffCell");
+      diffCell.innerHTML = "";
+
+      if (!a.ok || !b.ok) {
+        const which = !a.ok ? "A" : "B";
+        const errMsg = !a.ok ? a.error : b.error;
+        statusCell.innerHTML = `<span class="pill pill-warn">⚠ error en ${which}</span>`;
+        diffCell.innerHTML = `<button class="linklike" data-msg="${escapeAttr(errMsg)}">ver error</button>`;
+        diffCell.querySelector("button").addEventListener("click", (e) => showPanel(tr, `<span class="error">${escapeHtml(errMsg)}</span>`));
+        return;
+      }
+      if (diff && diff.error) {
+        statusCell.innerHTML = `<span class="pill pill-warn">⚠ ${escapeHtml(diff.error)}</span>`;
+        return;
+      }
+      if (diff && diff.identical) {
+        statusCell.innerHTML = `<span class="pill pill-ok">✓ idéntico</span>`;
+        diffCell.innerHTML = pdfLinks(a.token, b.token);
+        return;
+      }
+      statusCell.innerHTML = `<span class="pill pill-bad">✕ distinto (${diff.similarity}%)</span>`;
+      diffCell.innerHTML = pdfLinks(a.token, b.token) + ` · <button class="linklike">ver diff</button>`;
+      const btn = diffCell.querySelector("button.linklike:last-child");
+      btn.addEventListener("click", () => showPanel(tr, `<div class="difftable-wrap">${diff.html}</div>`));
+    }
+
+    function pdfLinks(tokenA, tokenB) {
+      const a = tokenA ? `<a href="/pdf/${tokenA}" target="_blank">PDF A</a>` : "";
+      const b = tokenB ? `<a href="/pdf/${tokenB}" target="_blank">PDF B</a>` : "";
+      return [a, b].filter(Boolean).join(" · ");
+    }
+
+    function escapeHtml(s) { return (s || "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+    function escapeAttr(s) { return escapeHtml(s).replace(/"/g, "&quot;"); }
+
+    function showPanel(tr, html) {
+      const next = tr.nextElementSibling;
+      if (next && next.classList.contains("diff-row")) { next.remove(); return; }
+      casesBody.querySelectorAll(".diff-row").forEach(r => r.remove());
+      const row = document.createElement("tr");
+      row.className = "diff-row";
+      row.innerHTML = `<td colspan="11">${html}</td>`;
+      tr.after(row);
+    }
+  </script>
+</body>
+</html>

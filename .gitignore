@@ -1,0 +1,15 @@
+# Secretos / entorno local
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Claves SSH (nunca commitear) — este proyecto no trae copia propia
+*.pem
+keys/
+
+# Oracle Instant Client (este proyecto no trae copia propia)
+oracle/

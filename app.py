@@ -1,0 +1,136 @@
+"""App web para probar que dos versiones de un mismo imprimible Jasper
+(p.ej. Car_Mul vs Car_Mul_V3) producen el mismo contenido, con datos reales.
+
+- /cases: arma una tanda de casos de prueba (POLICY_ID, ANNEX_ID) leyendo
+  INSOR_GDS.CAR_MUL_VIEW (ver cases.py).
+- /run_case: para un caso, pide el PDF a ambos reportes via OIC (reports.py),
+  mide cuanto tarda cada uno y diffea el texto extraido (compare.py).
+- /pdf/<token>: sirve el PDF de una corrida anterior (para verlo/descargarlo).
+
+Un solo usuario, sin persistencia entre reinicios: los PDFs de la corrida
+viven en memoria (ver _pdf_store).
+"""
+from __future__ import annotations
+
+import time
+import uuid
+
+import requests
+from flask import Flask, Response, abort, jsonify, render_template, request
+
+from cases import list_cases
+from compare import compare_pdfs
+from config.environments import ENVIRONMENTS
+from reports import OIC_PASSWORD, fetch_report
+
+app = Flask(__name__)
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.json.sort_keys = False
+
+# token -> bytes PDF de la ultima corrida. Se acota para no crecer sin limite
+# en una sesion larga (no hace falta persistir entre corridas viejas).
+_pdf_store: dict[str, bytes] = {}
+_pdf_order: list[str] = []
+_PDF_STORE_MAX = 200
+
+
+def _store_pdf(pdf_bytes: bytes | None) -> str | None:
+    if not pdf_bytes:
+        return None
+    token = uuid.uuid4().hex
+    _pdf_store[token] = pdf_bytes
+    _pdf_order.append(token)
+    while len(_pdf_order) > _PDF_STORE_MAX:
+        old = _pdf_order.pop(0)
+        _pdf_store.pop(old, None)
+    return token
+
+
+@app.route("/")
+def index():
+    envs = [{"key": k, "label": v["label"]} for k, v in ENVIRONMENTS.items()]
+    return render_template("index.html", environments=envs)
+
+
+@app.route("/cases", methods=["POST"])
+def cases_route():
+    data = request.get_json(silent=True) or {}
+    env = data.get("env", "")
+    limit = data.get("limit", 5)
+    if env not in ENVIRONMENTS:
+        return jsonify({"error": "Ambiente invalido."}), 400
+    try:
+        cases = list_cases(env, limit=limit)
+    except Exception as exc:  # tunel / conexion / oracle
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
+    return jsonify({"cases": cases})
+
+
+@app.route("/run_case", methods=["POST"])
+def run_case():
+    data = request.get_json(silent=True) or {}
+    env = data.get("env", "")
+    report_a = (data.get("report_a") or "").strip()
+    report_b = (data.get("report_b") or "").strip()
+    params = data.get("params") or []
+    swap_order = bool(data.get("swap_order"))
+    if env not in ENVIRONMENTS:
+        return jsonify({"error": "Ambiente invalido."}), 400
+    if not report_a or not report_b:
+        return jsonify({"error": "Faltan los nombres de los reportes."}), 400
+    if not OIC_PASSWORD:
+        return jsonify({"error": "OIC_PASSWORD no configurado en .env."}), 500
+
+    # El que se pide primero se beneficia del buffer cache de Oracle que deja
+    # tibio el que se pidio antes (mismos bloques de la misma poliza), lo que
+    # infla la mejora medida si siempre se llama en el mismo orden. Alternar
+    # el orden entre casos (swap_order lo decide el frontend) reparte ese
+    # sesgo entre A y B en vez de favorecer siempre al mismo.
+    order = (("b", report_b), ("a", report_a)) if swap_order else (("a", report_a), ("b", report_b))
+
+    sides = {}
+    for side, report in order:
+        t0 = time.monotonic()
+        try:
+            resp = fetch_report(env, report, params)
+        except requests.RequestException as exc:
+            sides[side] = {"ok": False, "error": f"Error llamando a OIC: {exc}", "elapsed": time.monotonic() - t0}
+            continue
+        elapsed = time.monotonic() - t0
+        if resp.status_code != 200:
+            sides[side] = {
+                "ok": False,
+                "elapsed": elapsed,
+                "error": f"OIC devolvio {resp.status_code}: {resp.text[:300]}",
+            }
+            continue
+        sides[side] = {"ok": True, "elapsed": elapsed, "size": len(resp.content), "bytes": resp.content}
+
+    diff = None
+    if sides["a"]["ok"] and sides["b"]["ok"]:
+        try:
+            diff = compare_pdfs(sides["a"]["bytes"], sides["b"]["bytes"], report_a, report_b)
+        except Exception as exc:
+            diff = {"error": f"No se pudo leer alguno de los PDFs: {exc}"}
+
+    result = {}
+    for side in ("a", "b"):
+        s = sides[side]
+        out = {k: v for k, v in s.items() if k != "bytes"}
+        out["token"] = _store_pdf(s.get("bytes"))
+        result[side] = out
+    result["diff"] = diff
+    result["order"] = [side for side, _ in order]
+    return jsonify(result)
+
+
+@app.route("/pdf/<token>")
+def pdf_route(token):
+    pdf_bytes = _pdf_store.get(token)
+    if pdf_bytes is None:
+        abort(404)
+    return Response(pdf_bytes, mimetype="application/pdf")
+
+
+if __name__ == "__main__":
+    app.run(host="127.0.0.1", port=5003, debug=True)
