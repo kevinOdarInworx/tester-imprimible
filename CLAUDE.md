@@ -2,29 +2,51 @@
 
 App web (Flask, un solo usuario, `python app.py` o `run.bat` en
 `127.0.0.1:5003`) para demostrar que dos versiones de un mismo imprimible
-Jasper (el caso concreto: `Car_Mul` vs `Car_Mul_V3`, ver
+Jasper (el caso concreto que la motivó: `Car_Mul` vs `Car_Mul_V3`, ver
 `INSOR/shared_workspace/PRINTOUTS/FASE_1/Car_Mul_V3/README.md`) producen el
 mismo contenido para pólizas reales, aunque una sea mucho más rápida.
 
 ## Flujo
 
-1. El usuario elige ambiente (default SIT/PREPROD — ahí está desplegado
-   `Car_Mul_V3` hoy; en PROD todavía no, ver "Limitaciones conocidas") y los
-   nombres de los dos reportes a comparar (default `Car_Mul` / `Car_Mul_V3`)
-   y cuántos casos quiere probar.
-2. `/cases` (`cases.py`) arma la tanda de casos: candidatos de `POLICY_ID`
-   salen de `insis_gen_v10.policy` (tabla base, filtro barato por
-   `policy_state`/`insr_type`), y **solo** `INSOR_GDS.CAR_MUL_VIEW` decide si
-   un candidato es un caso valido — nunca se corre nada distinto de esa
-   vista para determinar elegibilidad, a pedido explícito.
+1. El usuario elige ambiente (sin default — el selector arranca sin nada
+   elegido a propósito, para no operar por error contra un ambiente que no
+   se pensó explícitamente; `Car_Mul_V3` hoy solo está desplegado en
+   SIT/PREPROD, ver "Limitaciones conocidas"), arriba
+   de todo, porque lo usan tanto la búsqueda de insumos como la ejecución.
+2. Para conseguir casos de prueba (pólizas reales) hay dos caminos, según la
+   familia de imprimible:
+   - **Car_Mul / Car_Mul_V3** (multinciso): `/cases` (`list_mul_cases` en
+     `cases.py`) arma la tanda leyendo `INSOR_GDS.CAR_MUL_VIEW`.
+   - **Car_Ind / Cot_Ind** (u otras familias "individuales"): el segmento
+     "Insumos: buscar pólizas por producto" deja elegir Familia + Producto +
+     Subtipo y llama a `/policy_cases` (`list_policy_cases`), que filtra
+     `insis_gen_v10.policy` por `policy_state` (según la familia) y
+     `insr_type` (el `product_code` elegido). `/products` (`list_products`)
+     trae el catálogo producto/subtipo → `product_code` desde
+     `cfg_nl_product`/`cfg_nl_product_text` (la query se la pasó el usuario
+     directamente — es la que usa el equipo para resolver nombres de
+     producto; ver detalle en `cases.py`).
+
+   **"Insumos" es semánticamente independiente de la comparación**, aunque
+   internamente reuse la misma tanda de datos para no duplicar la consulta:
+   busca pólizas para *conocerlas* (con `policy_id`, `policy_no`,
+   `policy_lot`, `insr_type`, `policy_state`, y `quote_id` si aplica) y las
+   muestra en su propia tabla ("Pólizas encontradas"), sin tocar la sección
+   de comparación. Solo si el usuario aprieta explícitamente "Usar estas
+   pólizas como casos de prueba" esa tanda pasa a ser `cases` y aparece en
+   "Casos de prueba" — nunca como efecto automático de buscar.
+
+   Cualquiera sea el origen, cada caso trae un campo `params` ya armado con
+   la forma exacta que espera OIC para esa familia (`[policy_id, annex_id]`
+   para Car_Mul/Car_Ind, `[quote_id]` para Cot_Ind) — el frontend nunca arma
+   params a mano, solo reenvía `case.params`.
 3. Por cada caso seleccionado, `/run_case` llama al flujo OIC JASPER_INSOR
    (`reports.py`, mismo mecanismo que `generar-imprimibles/config/
    imprimibles.py` pero sin catálogo fijo de reportes — acá el nombre es
    libre porque se prueban reportes que todavía no están catalogados) para
-   los dos reportes con los mismos `string_param1/2` (`POLICY_ID`,
-   `ANNEX_ID`), mide cuánto tarda cada uno, y compara el texto extraído de
-   ambos PDFs (`compare.py`, pdfplumber + difflib) para mostrar si son
-   idénticos y, si no, un diff lado a lado.
+   los dos reportes con los mismos parámetros, mide cuánto tarda cada uno, y
+   compara el texto extraído de ambos PDFs (`compare.py`, pdfplumber +
+   difflib) para mostrar si son idénticos y, si no, un diff lado a lado.
 
 ## Por qué se alterna quién se pide primero
 
@@ -52,8 +74,10 @@ la vista puede tardar varios segundos, el default de casos es chico (5).
 
 ## Archivos clave
 
-- `app.py` — rutas Flask: `/`, `/cases`, `/run_case`, `/pdf/<token>`.
-- `cases.py` — descubrimiento de casos (`list_cases`), ver arriba.
+- `app.py` — rutas Flask: `/`, `/cases`, `/products`, `/policy_cases`,
+  `/run_case`, `/pdf/<token>`.
+- `cases.py` — descubrimiento de casos (`list_mul_cases`, `list_products`,
+  `list_policy_cases`), ver arriba.
 - `reports.py` — llamada al flujo OIC JASPER_INSOR (`fetch_report`), nombre
   de reporte libre (sin catálogo).
 - `compare.py` — extrae texto de cada PDF (pdfplumber) y arma el diff
@@ -78,10 +102,41 @@ la vista puede tardar varios segundos, el default de casos es chico (5).
 
 ## Limitaciones conocidas
 
-- Solo sabe armar casos para la familia `Car_Mul` (vía `CAR_MUL_VIEW`). Para
-  testear otro par de imprimibles (p.ej. `Cot_Mul` vs `Cot_Mul_V3`) hay que
-  adaptar `cases.py` a la vista/parámetros de esa familia — `reports.py` y
-  `compare.py` ya son genéricos.
+- Familias soportadas para conseguir casos: `Car_Mul` (vía `CAR_MUL_VIEW`) y
+  `Car_Ind`/`Cot_Ind` (vía `insis_gen_v10.policy` + catálogo de producto).
+  Para otra familia (p.ej. `Cot_Mul`, `End_Ind`) hay que agregar su regla en
+  `cases.py` — `reports.py` y `compare.py` ya son genéricos, no hace falta
+  tocarlos.
+- El filtro de `policy_state` por familia (`FAMILIES` en `cases.py`) lo dio
+  el usuario de memoria (`Car_Ind`: `policy_state >= 1`; `Cot_Ind`:
+  `policy_state = -4`, igual al `cotizacion = estado == -4` que ya usa
+  `generar-imprimibles/imprimibles.py`) — no está re-derivado de ningún otro
+  doc, así que si en la práctica aparecen falsos negativos/positivos, el
+  primer sospechoso es ese filtro.
+- El par (Producto, Subtipo) en el buscador de insumos resuelve un
+  `product_code` (=`policy.INSR_TYPE`) exacto contra el catálogo
+  `cfg_nl_product`/`cfg_nl_product_text`/`hst_object_type`. Un mismo
+  `product_text` puede tener más de una fila de `subtipo` — en la práctica
+  (verificado contra SIT real), lo común es que TODAS esas filas compartan
+  el mismo `product_code` (p.ej. "RC Obligatoria" tiene ~10 subtipos, los 10
+  con código 1108; "Fronterizos y legalizados" tiene 2, ambos 1035), no que
+  cada subtipo traiga un código distinto. El selector de Subtipo se habilita
+  cuando hay más de una fila (no más de un código); si hay una sola, se usa
+  directo sin mostrar el selector.
+  La interpretación de qué es "subtipo" (a qué objeto de negocio —
+  póliza/cotización/endoso — está ligada esa configuración de producto) es
+  una lectura del research, no algo que el usuario confirmó explícitamente;
+  si el subtipo mostrado no tiene sentido para algún producto, avisar.
+- **Bug ya corregido, ojo si se retoca el dropdown de Subtipo**: como varias
+  filas de subtipo suelen compartir el mismo `product_code`, usar ese código
+  como `value` de cada `<div class="dropdown-item">` los dejaba con el mismo
+  `data-value` — al clickear, `items.find(x => x.value === el.dataset.value)`
+  siempre devolvía la PRIMERA fila que matcheaba ese código, sin importar
+  cuál subtipo se clickeara (el usuario lo vio como "no me deja elegir el de
+  más abajo"). El fix (`fillSubtipos` en `templates/index.html`) usa el
+  índice de la fila dentro de `filas` como `value`, que siempre es único, y
+  resuelve el `product_code` real recién en el handler de `change` indexando
+  `filas[idx]`.
 - `Car_Mul_V3` NO está desplegado en PROD todavía (probado: OIC devuelve
   500). Sí está desplegado y responde bien en SIT/PREPROD (probado: PDF
   idéntico al de `Car_Mul` para una póliza real), que por eso es el default.

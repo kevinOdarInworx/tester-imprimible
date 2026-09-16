@@ -1,8 +1,12 @@
 """App web para probar que dos versiones de un mismo imprimible Jasper
 (p.ej. Car_Mul vs Car_Mul_V3) producen el mismo contenido, con datos reales.
 
-- /cases: arma una tanda de casos de prueba (POLICY_ID, ANNEX_ID) leyendo
-  INSOR_GDS.CAR_MUL_VIEW (ver cases.py).
+- /cases: arma una tanda de casos de prueba multinciso (POLICY_ID, ANNEX_ID)
+  leyendo INSOR_GDS.CAR_MUL_VIEW (ver cases.py).
+- /products: catalogo producto/subtipo -> product_code, para los selectores
+  de la busqueda por producto (Car_Ind/Cot_Ind).
+- /policy_cases: arma una tanda de casos para Car_Ind/Cot_Ind filtrando
+  insis_gen_v10.policy por estado + producto.
 - /run_case: para un caso, pide el PDF a ambos reportes via OIC (reports.py),
   mide cuanto tarda cada uno y diffea el texto extraido (compare.py).
 - /pdf/<token>: sirve el PDF de una corrida anterior (para verlo/descargarlo).
@@ -18,7 +22,7 @@ import uuid
 import requests
 from flask import Flask, Response, abort, jsonify, render_template, request
 
-from cases import list_cases
+from cases import FAMILIES, list_mul_cases, list_policy_cases, list_products
 from compare import compare_pdfs
 from config.environments import ENVIRONMENTS
 from reports import OIC_PASSWORD, fetch_report
@@ -60,7 +64,40 @@ def cases_route():
     if env not in ENVIRONMENTS:
         return jsonify({"error": "Ambiente invalido."}), 400
     try:
-        cases = list_cases(env, limit=limit)
+        cases = list_mul_cases(env, limit=limit)
+    except Exception as exc:  # tunel / conexion / oracle
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
+    return jsonify({"cases": cases})
+
+
+@app.route("/products", methods=["POST"])
+def products_route():
+    data = request.get_json(silent=True) or {}
+    env = data.get("env", "")
+    if env not in ENVIRONMENTS:
+        return jsonify({"error": "Ambiente invalido."}), 400
+    try:
+        products = list_products(env)
+    except Exception as exc:
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
+    return jsonify({"products": products, "families": [{"key": k, "label": v["label"]} for k, v in FAMILIES.items()]})
+
+
+@app.route("/policy_cases", methods=["POST"])
+def policy_cases_route():
+    data = request.get_json(silent=True) or {}
+    env = data.get("env", "")
+    family = data.get("family", "")
+    product_codes = data.get("product_codes") or []
+    limit = data.get("limit", 5)
+    if env not in ENVIRONMENTS:
+        return jsonify({"error": "Ambiente invalido."}), 400
+    if not product_codes:
+        return jsonify({"error": "Falta elegir un producto."}), 400
+    try:
+        cases = list_policy_cases(env, family, [int(c) for c in product_codes], limit=limit)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     except Exception as exc:  # tunel / conexion / oracle
         return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
     return jsonify({"cases": cases})
