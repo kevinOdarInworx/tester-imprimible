@@ -294,13 +294,15 @@
     <div class="card">
       <h2>Configuración de la comparación</h2>
       <div class="config-grid">
-        <div>
+        <div class="dropdown">
           <label for="reportA">Reporte A (base)</label>
-          <input id="reportA" value="Car_Mul" autocomplete="off" />
+          <input id="reportA" placeholder="Ej: Car_Mul" autocomplete="off" />
+          <div class="dropdown-menu" id="reportAMenu"></div>
         </div>
-        <div>
+        <div class="dropdown">
           <label for="reportB">Reporte B (a validar)</label>
-          <input id="reportB" value="Car_Mul_V3" autocomplete="off" />
+          <input id="reportB" placeholder="Ej: Car_Mul_V3" autocomplete="off" />
+          <div class="dropdown-menu" id="reportBMenu"></div>
         </div>
         <div>
           <label for="limit">Casos</label>
@@ -354,6 +356,52 @@
     const panelProducto = $("panelProducto"), panelIdentificador = $("panelIdentificador");
     const polIdent = $("polIdent"), btnResolverPoliza = $("btnResolverPoliza"), polHint = $("polHint");
     const imgDropZone = $("imgDropZone"), imgFileInput = $("imgFileInput"), ocrHint = $("ocrHint");
+
+    // --- Autocompletar Reporte A/B con las familias de PRINTOUTS_DIR (carpetas
+    // en disco, incluye experimentales sin catalogar como Car_Mul_V3). Se
+    // sigue pudiendo escribir cualquier nombre a mano (son <input> normales,
+    // esto es solo sugerencia) por si el reporte no tiene carpeta.
+    //
+    // Usa el mismo .dropdown-menu que Producto/Subtipo en vez de <input
+    // list="..."> (datalist nativo): en este entorno el datalist se queda
+    // trabado despues de elegir una opcion una vez y no deja abrir de nuevo
+    // para elegir otra (mismo tipo de bug que el <select> que se abria
+    // "hacia arriba" — controles nativos de formulario se portan raro acá).
+    let reportFamilies = [];
+    let reportNamesLoaded = false;
+    async function loadReportNames() {
+      if (reportNamesLoaded) return;
+      reportNamesLoaded = true;
+      try {
+        const res = await fetch("/report_families");
+        const data = await res.json();
+        reportFamilies = data.families || [];
+      } catch { /* sin sugerencias, se puede seguir escribiendo a mano */ }
+    }
+
+    function attachReportAutocomplete(inputEl, menuEl) {
+      function render() {
+        const q = inputEl.value.trim().toLowerCase();
+        const items = reportFamilies.filter(f => !q || f.toLowerCase().includes(q));
+        if (!items.length) { menuEl.classList.remove("open"); return; }
+        menuEl.innerHTML = items.map(f => `<div class="dropdown-item" data-value="${escapeAttr(f)}">${escapeHtml(f)}</div>`).join("");
+        menuEl.querySelectorAll(".dropdown-item").forEach(el => {
+          // mousedown (no click) + preventDefault: evita que el input pierda
+          // foco (blur) antes de que el click en el item llegue a procesarse.
+          el.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            inputEl.value = el.dataset.value;
+            menuEl.classList.remove("open");
+          });
+        });
+        menuEl.classList.add("open");
+      }
+      inputEl.addEventListener("focus", async () => { await loadReportNames(); render(); });
+      inputEl.addEventListener("input", render);
+      inputEl.addEventListener("blur", () => setTimeout(() => menuEl.classList.remove("open"), 100));
+    }
+    attachReportAutocomplete(reportAEl, $("reportAMenu"));
+    attachReportAutocomplete(reportBEl, $("reportBMenu"));
 
     // --- OCR de imagen (Tesseract.js por CDN, cargado recien al primer uso:
     // es la unica dependencia externa de esta app, todo lo demas es local).

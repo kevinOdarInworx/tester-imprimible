@@ -125,6 +125,17 @@ la vista puede tardar varios segundos, el default de casos es chico (5).
   real solo pasa si `ping()` falla o al terminar el proceso (`_close_all`).
   Si se vuelve a copiar este `db.py` a otra app hermana, decidir a
   propósito si también quiere este pooling o el original sin cachear.
+- `printouts.py` — `list_families()` (copiado de
+  `versiones-vistas-imprimibles/printouts.py`, solo esa función): nombres de
+  carpeta bajo `PRINTOUTS_DIR` con `.jrxml` propio, usados para autocompletar
+  Reporte A/B (`/report_families`). El nombre de carpeta es exactamente el
+  nombre de reporte que espera OIC, así que sirve tanto para catalogados
+  (`Car_Mul`) como para experimentales sin desplegar (el caso de uso de esta
+  app). Los campos siguen siendo `<input list="reportNames">`, no un
+  selector rígido — se puede escribir cualquier nombre a mano aunque no
+  tenga carpeta (y de hecho `Car_Mul_V3` hoy no aparece: su carpeta está
+  vacía en disco, verificado — puede haber sido reorganizada fuera de esta
+  app).
 - `templates/index.html` — frontend único, reutiliza los tokens de diseño
   (colores, pills, tabla de diff) de `versiones-vistas-imprimibles`.
 

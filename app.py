@@ -10,6 +10,8 @@
 - /resolve_policy: busca una poliza por policy_id/policy_no/policy_lot/
   engagement_id/quote_id (el mismo buscador de generar-imprimibles, ver
   resolver.py), para la otra forma de conseguir insumos.
+- /report_families: nombres de carpeta bajo PRINTOUTS_DIR (printouts.py),
+  para sugerir valores en los campos Reporte A/B.
 - /run_case: para un caso, pide el PDF a ambos reportes via OIC (reports.py),
   mide cuanto tarda cada uno y diffea el texto extraido (compare.py).
 - /pdf/<token>: sirve el PDF de una corrida anterior (para verlo/descargarlo).
@@ -28,6 +30,7 @@ from flask import Flask, Response, abort, jsonify, render_template, request
 from cases import FAMILIES, list_mul_cases, list_policy_cases, list_products
 from compare import compare_pdfs
 from config.environments import ENVIRONMENTS
+from printouts import PRINTOUTS_DIR, list_families as list_report_families
 from reports import OIC_PASSWORD, fetch_report
 from resolver import resolve as resolve_policy
 
@@ -58,6 +61,11 @@ def _store_pdf(pdf_bytes: bytes | None) -> str | None:
 def index():
     envs = [{"key": k, "label": v["label"]} for k, v in ENVIRONMENTS.items()]
     return render_template("index.html", environments=envs)
+
+
+@app.route("/report_families")
+def report_families_route():
+    return jsonify({"families": list_report_families(), "dir": PRINTOUTS_DIR})
 
 
 @app.route("/cases", methods=["POST"])
