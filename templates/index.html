@@ -262,6 +262,28 @@
             <input id="prLimit" type="number" value="5" min="1" max="30" />
           </div>
         </div>
+
+        <div style="margin:14px 0">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; text-transform:none; font-weight:600; color:var(--text); font-size:13.5px">
+            <input type="checkbox" id="prSampleAll" style="width:auto" />
+            Muestrear todos los productos (en vez de elegir uno)
+          </label>
+        </div>
+        <div class="config-grid" id="prSampleFields" style="display:none; grid-template-columns:1fr 160px">
+          <div>
+            <label for="prScope">Alcance</label>
+            <select id="prScope">
+              <option value="all">Todos los productos</option>
+              <option value="autos">Solo Autos</option>
+              <option value="danios">Solo Daños</option>
+            </select>
+          </div>
+          <div>
+            <label for="prPerProduct">Casos por producto</label>
+            <input id="prPerProduct" type="number" value="2" min="1" max="10" />
+          </div>
+        </div>
+
         <div style="margin-top:14px">
           <button id="btnBuscarPolizas">Buscar pólizas</button>
         </div>
@@ -282,6 +304,7 @@
               <th data-sort="policy_state" data-type="num">Policy State</th>
               <th data-sort="quote_id" data-type="num">Quote ID</th>
               <th data-sort="eng_pol_type" data-type="str">Tipo (engagement)</th>
+              <th data-sort="producto" data-type="str">Producto</th>
             </tr>
           </thead>
           <tbody id="prResultsBody"></tbody>
@@ -321,6 +344,7 @@
     <div class="card" id="casesCard" style="display:none">
       <h2>Casos de prueba</h2>
       <div class="stats" id="runStats"></div>
+      <button id="btnRerun" class="secondary" style="display:none; margin-bottom:14px;">Reejecutar casos</button>
       <div class="cases-wrap">
         <table class="cases">
           <thead>
@@ -329,12 +353,12 @@
               <th>Póliza</th>
               <th>Endoso</th>
               <th>Parámetros OIC</th>
-              <th class="num">Ubicaciones</th>
+              <th>Producto</th>
               <th>Estado</th>
               <th>Orden</th>
               <th class="num">Tiempo A</th>
               <th class="num">Tiempo B</th>
-              <th class="num">Mejora</th>
+              <th class="num">B vs A</th>
               <th></th>
             </tr>
           </thead>
@@ -349,8 +373,11 @@
     const envEl = $("env"), reportAEl = $("reportA"), reportBEl = $("reportB"), limitEl = $("limit");
     const btnBuscar = $("btnBuscar"), btnRun = $("btnRun"), hintEl = $("hint");
     const casesCard = $("casesCard"), casesBody = $("casesBody"), checkAll = $("checkAll"), runStats = $("runStats");
+    const btnRerun = $("btnRerun");
     const prFamily = $("prFamily"), prLimit = $("prLimit");
     const btnBuscarPolizas = $("btnBuscarPolizas"), prHint = $("prHint");
+    const prSampleAll = $("prSampleAll"), prSampleFields = $("prSampleFields");
+    const prScope = $("prScope"), prPerProduct = $("prPerProduct");
     const prResultsCard = $("prResultsCard"), prResultsBody = $("prResultsBody"), btnUsarPolizas = $("btnUsarPolizas");
     const prResultsHead = $("prResultsHead");
     const tabBtnProducto = $("tabBtnProducto"), tabBtnIdentificador = $("tabBtnIdentificador");
@@ -541,7 +568,7 @@
       });
     });
 
-    let cases = []; // [{policy_id, annex_id, no_poliza, cant_ubicaciones, params, ...}]
+    let cases = []; // [{policy_id, annex_id, no_poliza, producto, params, ...}]
     let policyResults = []; // ultima tanda de /policy_cases o /resolve_policy (informativo, ver btnUsarPolizas)
     let policyResultsSource = null; // "producto" | "identificador" — de donde salio policyResults
     let products = []; // [{product_code, product_text, subtipo}]
@@ -611,6 +638,7 @@
 
     btnBuscar.addEventListener("click", buscarCasos);
     btnRun.addEventListener("click", ejecutar);
+    btnRerun.addEventListener("click", ejecutar);
     btnBuscarPolizas.addEventListener("click", buscarPolizas);
     checkAll.addEventListener("change", () => {
       casesBody.querySelectorAll(".rowCheck").forEach(cb => cb.checked = checkAll.checked);
@@ -620,7 +648,7 @@
     // comparacion) queda bloqueado hasta que se elige uno — antes tirar
     // "Ambiente invalido." recien al intentar usarlo era mas confuso que
     // simplemente no dejar tocarlo todavia.
-    const envGatedControls = [prFamily, prLimit, btnBuscarPolizas, polIdent, btnResolverPoliza, reportAEl, reportBEl, limitEl, btnBuscar];
+    const envGatedControls = [prFamily, prLimit, btnBuscarPolizas, polIdent, btnResolverPoliza, reportAEl, reportBEl, limitEl, btnBuscar, prSampleAll, prScope, prPerProduct];
     function setEnvGatedEnabled(enabled) {
       envGatedControls.forEach(el => { el.disabled = !enabled; });
       ddProducto.setDisabled(!enabled);
@@ -707,15 +735,28 @@
       }
     });
 
+    prSampleAll.addEventListener("change", () => {
+      const sampling = prSampleAll.checked;
+      ddProducto.setDisabled(sampling);
+      ddSubtipo.setDisabled(sampling);
+      prLimit.disabled = sampling;
+      prSampleFields.style.display = sampling ? "grid" : "none";
+    });
+
     async function buscarPolizas() {
-      if (!selectedProductCodes.length) { prHint.innerHTML = '<span class="error">Elegí un producto.</span>'; return; }
+      const sampling = prSampleAll.checked;
+      if (!sampling && !selectedProductCodes.length) { prHint.innerHTML = '<span class="error">Elegí un producto.</span>'; return; }
       btnBuscarPolizas.disabled = true; btnBuscarPolizas.textContent = "Buscando…";
       prResultsCard.style.display = "none";
-      prHint.innerHTML = '<span class="spinner"></span> Consultando pólizas (tunel SSH + Oracle, puede tardar)…';
+      prHint.innerHTML = '<span class="spinner"></span> Consultando pólizas (tunel SSH + Oracle, puede tardar — muestrear todos los productos pega una consulta por cada uno)…';
       try {
-        const res = await fetch("/policy_cases", {
+        const url = sampling ? "/policy_cases_sample" : "/policy_cases";
+        const body = sampling
+          ? { env: envEl.value, family: prFamily.value, scope: prScope.value, per_product: parseInt(prPerProduct.value || "2", 10) }
+          : { env: envEl.value, family: prFamily.value, product_codes: selectedProductCodes, limit: parseInt(prLimit.value || "5", 10) };
+        const res = await fetch(url, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ env: envEl.value, family: prFamily.value, product_codes: selectedProductCodes, limit: parseInt(prLimit.value || "5", 10) }),
+          body: JSON.stringify(body),
         });
         const data = await res.json();
         if (!res.ok) { prHint.innerHTML = '<span class="error">' + (data.error || "Error") + '</span>'; return; }
@@ -763,6 +804,7 @@
           <td>${p.policy_state ?? "—"}</td>
           <td>${p.quote_id ?? "—"}</td>
           <td>${p.eng_pol_type ?? "—"}</td>
+          <td>${p.producto ?? "—"}</td>
         </tr>
       `).join("");
     }
@@ -821,13 +863,14 @@
 
     function renderCases() {
       runStats.innerHTML = "";
+      btnRerun.style.display = "none";
       casesBody.innerHTML = cases.map((c, i) => `
         <tr data-idx="${i}">
           <td><input type="checkbox" class="rowCheck" checked /></td>
           <td>${c.no_poliza || c.policy_id}</td>
           <td>${endosoLabel(c)}</td>
           <td class="mono muted">${paramsLabel(c)}</td>
-          <td class="num">${c.cant_ubicaciones ?? "—"}</td>
+          <td>${c.producto ?? "—"}</td>
           <td class="statusCell"><span class="pill pill-miss">pendiente</span></td>
           <td class="orderCell muted">—</td>
           <td class="num timeA">—</td>
@@ -843,9 +886,24 @@
       return s.toFixed(2) + "s";
     }
 
+    // Diferencia porcentual de B contra A: positivo = B más rápido, negativo
+    // = B más lento. Se prefiere esto al ratio A/B ("1.1×") porque no queda
+    // claro sin pensarlo si un numero mayor/menor a 1 es mejor o peor.
+    function speedupPct(aElapsed, bElapsed) {
+      return (aElapsed - bElapsed) / aElapsed;
+    }
+
+    function speedupHtml(pct) {
+      const pctTxt = Math.abs(pct * 100).toFixed(0) + "%";
+      if (Math.abs(pct) < 0.05) return `<span class="muted">≈ igual (${pctTxt})</span>`;
+      if (pct > 0) return `<span style="color:var(--ok)">${pctTxt} más rápido</span>`;
+      return `<span style="color:var(--bad)">${pctTxt} más lento</span>`;
+    }
+
     async function ejecutar() {
       btnRun.disabled = true; btnRun.textContent = "Ejecutando…";
       btnBuscar.disabled = true;
+      btnRerun.disabled = true; btnRerun.style.display = "none";
       const rows = [...casesBody.querySelectorAll("tr")].filter(tr => tr.querySelector(".rowCheck").checked);
       let ok = 0, bad = 0, err = 0;
       let speedups = [];
@@ -872,7 +930,7 @@
           renderRowResult(tr, data);
           if (!data.a.ok || !data.b.ok) { err++; }
           else if (data.diff && data.diff.error) { err++; }
-          else if (data.diff && data.diff.identical) { ok++; if (data.a.elapsed && data.b.elapsed) speedups.push(data.a.elapsed / data.b.elapsed); }
+          else if (data.diff && data.diff.identical) { ok++; if (data.a.elapsed && data.b.elapsed) speedups.push(speedupPct(data.a.elapsed, data.b.elapsed)); }
           else { bad++; }
         } catch (e) {
           statusCell.innerHTML = `<span class="pill pill-bad">✕ error de red</span>`;
@@ -883,6 +941,7 @@
 
       btnRun.disabled = false; btnRun.textContent = "Ejecutar comparación";
       btnBuscar.disabled = false;
+      btnRerun.disabled = false; btnRerun.style.display = "inline-block";
     }
 
     function renderStats(ok, bad, err, total, speedups) {
@@ -892,7 +951,7 @@
         `<span class="badge">Idénticos: <strong>${ok}</strong></span>` +
         (bad ? `<span class="badge" style="color:var(--bad)">Distintos: <strong>${bad}</strong></span>` : "") +
         (err ? `<span class="badge" style="color:var(--warn)">Errores: <strong>${err}</strong></span>` : "") +
-        (avg ? `<span class="badge">Mejora promedio: <strong>${avg.toFixed(1)}×</strong></span>` : "");
+        (avg != null ? `<span class="badge">B vs A en promedio: <strong>${speedupHtml(avg)}</strong></span>` : "");
     }
 
     function renderRowResult(tr, data) {
@@ -900,7 +959,7 @@
       tr.querySelector(".orderCell").textContent = (order || []).map(s => s.toUpperCase()).join("→");
       tr.querySelector(".timeA").textContent = a.ok ? fmtTime(a.elapsed) : "—";
       tr.querySelector(".timeB").textContent = b.ok ? fmtTime(b.elapsed) : "—";
-      tr.querySelector(".speedup").textContent = (a.ok && b.ok && a.elapsed && b.elapsed) ? (a.elapsed / b.elapsed).toFixed(1) + "×" : "—";
+      tr.querySelector(".speedup").innerHTML = (a.ok && b.ok && a.elapsed && b.elapsed) ? speedupHtml(speedupPct(a.elapsed, b.elapsed)) : "—";
 
       const statusCell = tr.querySelector(".statusCell");
       const diffCell = tr.querySelector(".diffCell");

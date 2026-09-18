@@ -244,3 +244,47 @@ def list_policy_cases(env_key: str, family: str, product_codes: list[int], limit
                         "params": [policy_id, 0],
                     })
     return cases
+
+
+def _is_autos(product_code: int) -> bool:
+    # Mismo criterio que generar-imprimibles/imprimibles.py:_product().
+    return str(product_code).startswith("1")
+
+
+def list_products_sample(env_key: str, family: str, scope: str = "all", per_product: int = 2) -> list[dict]:
+    """Junta hasta `per_product` casos de CADA producto del catálogo (todos,
+    o acotado a autos/danios), para tener cobertura amplia del imprimible en
+    una sola tanda en vez de probar un producto a la vez.
+
+    Reusa `list_policy_cases` producto por producto (misma logica de armado
+    de casos, sin duplicarla) — la conexion se reusa por ambiente via el pool
+    de db.py, asi que no es una conexion nueva por producto.
+    """
+    if scope not in ("all", "autos", "danios"):
+        raise ValueError(f"Alcance desconocido: {scope}")
+    per_product = max(1, min(int(per_product or 2), 10))
+
+    products = list_products(env_key)
+    # Un product_text puede traer mas de una fila (subtipo); alcanza con el
+    # codigo minimo por nombre (ver nota en CLAUDE.md sobre por que no hace
+    # falta "Todos" los codigos para esto).
+    min_code_by_name: dict[str, int] = {}
+    for p in products:
+        code = p["product_code"]
+        if p["product_text"] not in min_code_by_name or code < min_code_by_name[p["product_text"]]:
+            min_code_by_name[p["product_text"]] = code
+
+    codes = sorted(set(min_code_by_name.values()))
+    if scope == "autos":
+        codes = [c for c in codes if _is_autos(c)]
+    elif scope == "danios":
+        codes = [c for c in codes if not _is_autos(c)]
+
+    name_by_code = {code: name for name, code in min_code_by_name.items()}
+    cases: list[dict] = []
+    for code in codes:
+        found = list_policy_cases(env_key, family, [code], limit=per_product)
+        for c in found:
+            c["producto"] = name_by_code.get(code)
+        cases.extend(found)
+    return cases

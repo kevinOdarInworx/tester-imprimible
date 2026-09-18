@@ -7,6 +7,9 @@
   de la busqueda por producto (Car_Ind/Cot_Ind).
 - /policy_cases: arma una tanda de casos para Car_Ind/Cot_Ind filtrando
   insis_gen_v10.policy por estado + producto.
+- /policy_cases_sample: junta unos pocos casos de CADA producto del catalogo
+  (opcionalmente solo autos o solo danios), para cobertura amplia en una
+  sola tanda.
 - /resolve_policy: busca una poliza por policy_id/policy_no/policy_lot/
   engagement_id/quote_id (el mismo buscador de generar-imprimibles, ver
   resolver.py), para la otra forma de conseguir insumos.
@@ -27,7 +30,7 @@ import uuid
 import requests
 from flask import Flask, Response, abort, jsonify, render_template, request
 
-from cases import FAMILIES, list_mul_cases, list_policy_cases, list_products
+from cases import FAMILIES, list_mul_cases, list_policy_cases, list_products, list_products_sample
 from compare import compare_pdfs
 from config.environments import ENVIRONMENTS
 from printouts import PRINTOUTS_DIR, list_families as list_report_families
@@ -108,6 +111,24 @@ def policy_cases_route():
         return jsonify({"error": "Falta elegir un producto."}), 400
     try:
         cases = list_policy_cases(env, family, [int(c) for c in product_codes], limit=limit)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # tunel / conexion / oracle
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
+    return jsonify({"cases": cases})
+
+
+@app.route("/policy_cases_sample", methods=["POST"])
+def policy_cases_sample_route():
+    data = request.get_json(silent=True) or {}
+    env = data.get("env", "")
+    family = data.get("family", "")
+    scope = data.get("scope", "all")
+    per_product = data.get("per_product", 2)
+    if env not in ENVIRONMENTS:
+        return jsonify({"error": "Ambiente invalido."}), 400
+    try:
+        cases = list_products_sample(env, family, scope=scope, per_product=per_product)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:  # tunel / conexion / oracle

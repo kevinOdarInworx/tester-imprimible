@@ -33,6 +33,19 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
      `cfg_nl_product_text` (la query se la pasó el usuario directamente — es
      la que usa el equipo para resolver nombres de producto; ver detalle en
      `cases.py`).
+
+     El checkbox "Muestrear todos los productos" cambia Producto/Subtipo/
+     Cantidad por Alcance (Todos/Autos/Danios, mismo criterio que
+     `_product()` de `generar-imprimibles/imprimibles.py`: `insr_type`
+     arranca con "1" = autos) + Casos por producto, y llama a
+     `/policy_cases_sample` (`list_products_sample`) en vez de
+     `/policy_cases`. Junta unos pocos casos de CADA producto del catálogo
+     reusando `list_policy_cases` producto por producto (sin duplicar su
+     lógica) — es rápido gracias al pool de conexión de `db.py`: medido
+     contra SIT real, 40 casos de los 20 productos de Car_Ind (`scope=all`,
+     `per_product=2`) en 16s; solo daños (11 productos) en 9.6s. Cada caso
+     de esta tanda trae un campo extra `producto` (de qué producto salió),
+     mostrado en su propia columna en "Pólizas encontradas".
    - **"Por identificador"**: pegás un `policy_id`/`policy_no`/`policy_lot`/
      `engagement_id`/`quote_id` y llama a `/resolve_policy` (`resolver.py`),
      que es el mismo buscador de `generar-imprimibles` (`policy.py` +
@@ -81,8 +94,10 @@ la app justo después de `Car_Mul` sobre la misma póliza. Por eso el frontend
 alterna `swap_order` caso por caso (par/impar) y el backend arma el orden de
 llamada en base a ese flag; `/run_case` devuelve `order` (p.ej. `["b","a"]`)
 para que la columna "Orden" en la tabla muestre qué se pidió primero en cada
-fila — la columna "Mejora" sigue siendo optimista para cualquier caso donde A
-salió primero, pero al menos no está sesgada sistemáticamente a favor de B.
+fila — la columna "B vs A" (diferencia porcentual, no ratio ×, para que quede
+claro sin pensarlo si B fue más rápido o más lento) sigue siendo optimista
+para cualquier caso donde A salió primero, pero al menos no está sesgada
+sistemáticamente a favor de B.
 
 ## Por qué CAR_MUL_VIEW nunca se consulta sin `WHERE POLICY_ID`
 
@@ -98,9 +113,10 @@ la vista puede tardar varios segundos, el default de casos es chico (5).
 ## Archivos clave
 
 - `app.py` — rutas Flask: `/`, `/cases`, `/products`, `/policy_cases`,
-  `/resolve_policy`, `/run_case`, `/pdf/<token>`.
+  `/policy_cases_sample`, `/resolve_policy`, `/report_families`, `/run_case`,
+  `/pdf/<token>`.
 - `cases.py` — descubrimiento de casos (`list_mul_cases`, `list_products`,
-  `list_policy_cases`), ver arriba.
+  `list_policy_cases`, `list_products_sample`), ver arriba.
 - `resolver.py` — buscador por identificador (`resolve`, con `lookup_policy`
   + `resolve_engagement`/`resolve_quote`), copiado de
   `generar-imprimibles/policy.py` + las dos funciones homónimas de
