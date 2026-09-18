@@ -185,6 +185,7 @@
     }
     #imgDropZone:hover, #imgDropZone:focus { border-color: var(--primary); outline: none; }
     #imgDropZone.dragover { border-color: var(--primary); background: var(--primary-soft); }
+    #imgDropZone.disabled { opacity: .45; pointer-events: none; cursor: default; }
     .linklike-inline { color: var(--primary); text-decoration: underline; font-weight: 600; }
   </style>
 </head>
@@ -311,7 +312,7 @@
         <div></div>
       </div>
       <div style="margin-top:14px; display:flex; gap:10px;">
-        <button id="btnBuscar">Buscar casos en CAR_MUL_VIEW</button>
+        <button id="btnBuscar">Buscar casos</button>
         <button id="btnRun" class="secondary" disabled>Ejecutar comparación</button>
       </div>
       <div class="hint" id="hint">Los casos salen de INSOR_GDS.CAR_MUL_VIEW, filtrados siempre por POLICY_ID (la vista es cara sin filtro), así que buscar casos puede tardar varios segundos por candidato.</div>
@@ -438,7 +439,7 @@
     // imagen en el portapapeles Y la pestaña "Por identificador" esta
     // activa (si no, no interfiere con pegar texto en otro lado).
     document.addEventListener("paste", (e) => {
-      if (panelIdentificador.style.display === "none") return;
+      if (panelIdentificador.style.display === "none" || !envEl.value) return;
       const items = (e.clipboardData || window.clipboardData || {}).items;
       if (!items) return;
       for (const item of items) {
@@ -600,6 +601,7 @@
         setButtonText(t) { btn.textContent = t; },
         select(value, label) { hidden.value = value; btn.textContent = label; },
         reset(placeholder) { items = []; hidden.value = ""; btn.textContent = placeholder; },
+        setDisabled(v) { btn.disabled = v; },
         el: hidden,
       };
     }
@@ -614,7 +616,24 @@
       casesBody.querySelectorAll(".rowCheck").forEach(cb => cb.checked = checkAll.checked);
     });
 
-    envEl.addEventListener("change", () => { productsLoadedFor = null; });
+    // Todo lo que necesita un ambiente elegido (buscar insumos, ejecutar
+    // comparacion) queda bloqueado hasta que se elige uno — antes tirar
+    // "Ambiente invalido." recien al intentar usarlo era mas confuso que
+    // simplemente no dejar tocarlo todavia.
+    const envGatedControls = [prFamily, prLimit, btnBuscarPolizas, polIdent, btnResolverPoliza, reportAEl, reportBEl, limitEl, btnBuscar];
+    function setEnvGatedEnabled(enabled) {
+      envGatedControls.forEach(el => { el.disabled = !enabled; });
+      ddProducto.setDisabled(!enabled);
+      ddSubtipo.setDisabled(!enabled);
+      imgDropZone.classList.toggle("disabled", !enabled);
+      imgDropZone.tabIndex = enabled ? 0 : -1;
+    }
+    setEnvGatedEnabled(false);
+
+    envEl.addEventListener("change", () => {
+      productsLoadedFor = null;
+      setEnvGatedEnabled(!!envEl.value);
+    });
     ddProducto.el.addEventListener("change", fillSubtipos);
 
     async function loadProducts() {
@@ -784,7 +803,7 @@
       } catch (err) {
         hintEl.innerHTML = '<span class="error">Error de red: ' + err + '</span>';
       } finally {
-        btnBuscar.disabled = false; btnBuscar.textContent = "Buscar casos en CAR_MUL_VIEW";
+        btnBuscar.disabled = false; btnBuscar.textContent = "Buscar casos";
       }
     }
 
@@ -795,7 +814,9 @@
     }
 
     function paramsLabel(c) {
-      return (c.params || []).map((v, i) => `string_param${i + 1}=${v}`).join(" · ");
+      // Uno abajo del otro (no " · " en la misma linea): la columna ocupa
+      // menos ancho y deja mas espacio a Tiempo A/B/Mejora/PDF.
+      return (c.params || []).map((v, i) => `string_param${i + 1}=${v}`).join("<br>");
     }
 
     function renderCases() {

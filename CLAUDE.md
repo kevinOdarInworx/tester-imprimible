@@ -13,12 +13,17 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
    se pensó explícitamente; `Car_Mul_V3` hoy solo está desplegado en
    SIT/PREPROD, ver "Limitaciones conocidas"), arriba
    de todo, porque lo usan tanto la búsqueda de insumos como la ejecución.
-2. Para conseguir casos de prueba (pólizas reales), la sección "Insumos"
-   tiene dos pestañas independientes (más el camino de `Car_Mul`):
+2. Para conseguir casos de prueba (pólizas reales) hay dos caminos, según la
+   familia de imprimible:
    - **Car_Mul / Car_Mul_V3** (multinciso): `/cases` (`list_mul_cases` en
      `cases.py`) arma la tanda leyendo `INSOR_GDS.CAR_MUL_VIEW` — no vive en
-     "Insumos", tiene su propio buscador en "Configuración de la comparación"
-     porque su elegibilidad depende de esa vista, no de producto/estado.
+     "Insumos", tiene su propio buscador ("Buscar casos", sin "CAR_MUL_VIEW"
+     ni "Car_Mul" ni "multinciso" en el texto visible del botón — se le pidió
+     sacarle toda mención específica) en "Configuración de la comparación"
+     porque su elegibilidad depende de esa vista puntual, no de
+     producto/estado. El botón se probó moviéndolo a "Insumos" como una
+     tercera pestaña, pero se revirtió (el pedido era solo cambiarle el
+     nombre, no reubicarlo) — queda en su lugar original.
    - **"Por producto"** (Car_Ind/Cot_Ind u otras familias "individuales"):
      elegís Familia + Producto + Subtipo y llama a `/policy_cases`
      (`list_policy_cases`), que filtra `insis_gen_v10.policy` por
@@ -45,10 +50,14 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
    y son **semánticamente independientes de la comparación**, aunque
    internamente reusen la misma tanda de datos para no duplicar la consulta:
    buscan pólizas para *conocerlas* (con `policy_id`, `policy_no`,
-   `policy_lot`, `insr_type`, `policy_state`, y `quote_id` si aplica), sin
+   `policy_lot`, `insr_type`, `policy_state`, y `quote_id` si aplica) sin
    tocar la sección de comparación. Solo si el usuario aprieta explícitamente
    "Usar estas pólizas como casos de prueba" esa tanda pasa a ser `cases` y
    aparece en "Casos de prueba" — nunca como efecto automático de buscar.
+   `/cases` (multinciso), en cambio, alimenta `cases`/"Casos de prueba"
+   directo — nunca pasó por "Pólizas encontradas" ni tuvo el paso explícito
+   de "Usar estas pólizas..." (es el flujo más viejo de la app, de antes de
+   que existiera "Insumos"; no se tocó al revertir el intento de moverlo).
 
    Cualquiera sea el origen, cada caso trae un campo `params` ya armado con
    la forma exacta que espera OIC para esa familia (`[policy_id, annex_id]`
@@ -206,3 +215,60 @@ la vista puede tardar varios segundos, el default de casos es chico (5).
   idéntico al de `Car_Mul` para una póliza real), que por eso es el default.
   Si `/run_case` devuelve error en el lado B en otro ambiente, probablemente
   sea por esto.
+- **`Car_Mul_V3` con `policy_id=100000229284` (SIT) da 500.** Esa póliza tiene
+  `CANT_UBICACIONES=1` en `CAR_MUL_VIEW` (single inciso) — `Car_Mul` → 200 OK,
+  `Car_Mul_V3` → 500 con cuerpo vacío (OIC no expone detalle/stack trace, sin
+  acceso a logs de Jasper/OIC para confirmar la causa exacta, y no se pudo
+  inspeccionar el JRXML: la carpeta `Car_Mul_V3` en `PRINTOUTS_DIR` está
+  vacía en disco desde hace un tiempo — ver la nota de `printouts.py` en
+  "Archivos clave"). Semánticamente esto no debería pasar en producción (una
+  póliza de 1 ubicación usa `Car_Ind`, no `Car_Mul`) — pero como el buscador
+  "Por identificador" no filtra por `CANT_UBICACIONES` (a diferencia de "Por
+  producto"/`list_mul_cases`, que sí exige `> 1`), es fácil colar sin querer
+  un caso así si se resuelve una póliza puntual y se manda a comparar.
+  Descubierto de casualidad probando esta misma póliza para el caso de abajo
+  (`Car_Ind_V2`) — no es necesariamente el mismo tipo de bug, solo quedó
+  registrado.
+- **`Car_Ind_V2` con esa misma póliza (`100000229284`) en STST da 500, pero
+  en SIT funciona bien e idéntico a `Car_Ind`.** Diagnosticado con esta app:
+  - No es un problema de despliegue de `Car_Ind_V2` en STST en general —
+    otras pólizas (`100000231124`, `100000229616`, y otras con
+    `policy_state=12` como `100000006755`/`100000006816`) andan bien ahí.
+  - No es por `policy_state` (en SIT esa póliza tiene `policy_state=0`, en
+    STST `policy_state=12` — pero otras pólizas `state=12` en STST funcionan).
+  - Es específico de esta póliza en STST. Revisados `policy_annex` (un solo
+    annex 0), `claim` (ninguno) y `policy_eng_policies` (una fila,
+    `eng_pol_type='POLICY'`, sin `quote_id`) sin encontrar nada anómalo a
+    simple vista.
+  - Reproducido de forma consistente (2 reintentos, mismo 500 las dos veces
+    — no es transitorio de OIC).
+  - **Causa raíz encontrada** (el usuario pasó la traza de Jasper Studio):
+    `ClassCastException: Cannot cast java.math.BigDecimal to java.lang.String`
+    evaluando `$P{id_poliza}` dentro de un `<jr:list>` (`FillDatasetRun` /
+    `BaseFillList.evaluate` en la traza). En
+    `INSOR/shared_workspace/PRINTOUTS/FASE_1/Car_Ind_V2/Car_Ind_Autos_v2.jrxml:1641`
+    (el `<jr:list>` del subDataset `special_conditions`, sección "CONDICIONES
+    ESPECIALES"):
+    ```xml
+    <datasetParameter name="id_poliza">
+      <datasetParameterExpression><![CDATA[$F{POLICY_ID}]]></datasetParameterExpression>
+    </datasetParameter>
+    ```
+    `$F{POLICY_ID}` es `BigDecimal` (columna NUMBER), pero el subreport
+    declara `id_poliza` como `class="java.lang.String"` (línea 75, usado en
+    `SPECIAL_CONDITIONS_VIEW.POLICY_ID = $P{id_poliza}`) — falta un
+    `String.valueOf($F{POLICY_ID})`. Un `<jr:list>` sin filas no evalúa sus
+    `datasetParameter`, por eso solo explota con pólizas que tienen ≥1
+    condición especial (de ahí que la mayoría de las pólizas de prueba no lo
+    disparen). El mismo patrón (`$F{POLICY_ID}` crudo sin `String.valueOf`)
+    aparece también en las líneas 1338 y 1439 (subDatasets `coberturas_inciso`
+    y `servicios_asistencia_inciso`) — **revisado y descartado como riesgo
+    real**: esos dos van dentro de `<jr:table>`, no `<jr:list>` (la traza es
+    específica del paquete `net.sf.jasperreports.components.list`), y
+    `<jr:table>` evalúa distinto. Se probó `policy_id=100000202489` en STST
+    (con filas reales en ambas vistas — `COVERED_RISKS_AUTOS_VIEW` con y sin
+    `RIESGOS_CUBIERTOS LIKE '%ASISTENCIA%'`, encontrada con un `GROUP BY`
+    sobre esa vista sin filtro por póliza, que puede tardar): `Car_Ind_V2`
+    respondió 200 OK, idéntico en tamaño a `Car_Ind`. El mismo patrón de
+    código (`$F{POLICY_ID}` crudo) sigue siendo un descuido, pero no crashea
+    en la práctica — solo el `<jr:list>` de `special_conditions` lo hace.
