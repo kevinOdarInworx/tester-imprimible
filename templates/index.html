@@ -213,11 +213,29 @@
     <div class="card">
       <h2>Insumos: buscar pólizas</h2>
       <div class="tabs" style="margin-bottom:18px">
-        <button class="tab-btn active" id="tabBtnProducto" type="button">Por producto</button>
-        <button class="tab-btn" id="tabBtnIdentificador" type="button">Por identificador</button>
+        <button class="tab-btn active" id="tabBtnIdentificador" type="button">Por identificador</button>
+        <button class="tab-btn" id="tabBtnProducto" type="button">Por producto</button>
       </div>
 
-      <div id="panelProducto">
+      <div id="panelIdentificador">
+        <label for="polIdent">Póliza (policy_id, policy_no, policy_lot, engagement_id o quote_id)</label>
+        <div style="display:flex; gap:10px; align-items:flex-start;">
+          <div style="flex:1"><input id="polIdent" placeholder="Ej: 132510 | 06/956/132510 | 100000225422 | 0600201107/0135867/00" autocomplete="off" /></div>
+          <button id="btnResolverPoliza">Resolver póliza</button>
+        </div>
+        <div class="hint" id="polHint">Mismo buscador que generar-imprimibles: prueba policy_id/policy_no/policy_lot directo, y si no encuentra nada, si es un engagement_id de autos multinciso o un quote_id de cotización. Tampoco ejecuta nada por sí solo.</div>
+
+        <div style="margin-top:18px">
+          <label>O extraer el identificador de una imagen (captura de pantalla)</label>
+          <div id="imgDropZone" tabindex="0">
+            Pegá una imagen (Ctrl+V) acá, arrastrala, o <span class="linklike-inline">elegí un archivo</span>
+            <input type="file" id="imgFileInput" accept="image/*" style="display:none" />
+          </div>
+          <div class="hint" id="ocrHint"></div>
+        </div>
+      </div>
+
+      <div id="panelProducto" style="display:none">
         <div class="config-grid">
           <div>
             <label for="prFamily">Familia</label>
@@ -247,24 +265,6 @@
           <button id="btnBuscarPolizas">Buscar pólizas</button>
         </div>
         <div class="hint" id="prHint">El producto/subtipo sale del catálogo de configuración (cfg_nl_product); Car_Ind pide pólizas emitidas (policy_state ≥ 1), Cot_Ind pide cotizaciones (policy_state = -4) con quote_id resuelto. Esto es solo para conocer pólizas reales de un producto — no ejecuta nada por sí solo.</div>
-      </div>
-
-      <div id="panelIdentificador" style="display:none">
-        <label for="polIdent">Póliza (policy_id, policy_no, policy_lot, engagement_id o quote_id)</label>
-        <div style="display:flex; gap:10px; align-items:flex-start;">
-          <div style="flex:1"><input id="polIdent" placeholder="Ej: 132510 | 06/956/132510 | 100000225422 | 0600201107/0135867/00" autocomplete="off" /></div>
-          <button id="btnResolverPoliza">Resolver póliza</button>
-        </div>
-        <div class="hint" id="polHint">Mismo buscador que generar-imprimibles: prueba policy_id/policy_no/policy_lot directo, y si no encuentra nada, si es un engagement_id de autos multinciso o un quote_id de cotización. Tampoco ejecuta nada por sí solo.</div>
-
-        <div style="margin-top:18px">
-          <label>O extraer el identificador de una imagen (captura de pantalla)</label>
-          <div id="imgDropZone" tabindex="0">
-            Pegá una imagen (Ctrl+V) acá, arrastrala, o <span class="linklike-inline">elegí un archivo</span>
-            <input type="file" id="imgFileInput" accept="image/*" style="display:none" />
-          </div>
-          <div class="hint" id="ocrHint"></div>
-        </div>
       </div>
     </div>
 
