@@ -24,6 +24,25 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
      producto/estado. El botón se probó moviéndolo a "Insumos" como una
      tercera pestaña, pero se revirtió (el pedido era solo cambiarle el
      nombre, no reubicarlo) — queda en su lugar original.
+
+     Ese mismo botón "Buscar casos" tiene un segundo modo: el checkbox
+     "Muestrear todos los productos" (con Familia + Alcance
+     Todos/Autos/Danios, mismo criterio que `_product()` de
+     `generar-imprimibles/imprimibles.py`: `insr_type` arranca con "1" =
+     autos + Casos por producto) cambia la llamada de `/cases` a
+     `/policy_cases_sample` (`list_products_sample`), que junta unos pocos
+     casos de CADA producto del catálogo reusando `list_policy_cases`
+     producto por producto (sin duplicar su lógica) — es rápido gracias al
+     pool de conexión de `db.py`: medido contra SIT real, 40 casos de los 20
+     productos de Car_Ind (`scope=all`, `per_product=2`) en 16s; solo daños
+     (11 productos) en 9.6s. Cada caso trae un campo extra `producto` (de
+     qué producto salió), mostrado en su propia columna en "Casos de
+     prueba". Este control vive en "Configuración de la comparación" (no en
+     "Insumos" junto al resto de la búsqueda "Por producto") porque a
+     diferencia de esa búsqueda — que es solo para *conocer* pólizas, ver
+     más abajo — el muestreo no tiene otro uso que alimentar la comparación:
+     escribe directo en "Casos de prueba", sin pasar por "Pólizas
+     encontradas" ni por el traspaso explícito.
    - **"Por producto"** (Car_Ind/Cot_Ind u otras familias "individuales"):
      elegís Familia + Producto + Subtipo y llama a `/policy_cases`
      (`list_policy_cases`), que filtra `insis_gen_v10.policy` por
@@ -33,19 +52,6 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
      `cfg_nl_product_text` (la query se la pasó el usuario directamente — es
      la que usa el equipo para resolver nombres de producto; ver detalle en
      `cases.py`).
-
-     El checkbox "Muestrear todos los productos" cambia Producto/Subtipo/
-     Cantidad por Alcance (Todos/Autos/Danios, mismo criterio que
-     `_product()` de `generar-imprimibles/imprimibles.py`: `insr_type`
-     arranca con "1" = autos) + Casos por producto, y llama a
-     `/policy_cases_sample` (`list_products_sample`) en vez de
-     `/policy_cases`. Junta unos pocos casos de CADA producto del catálogo
-     reusando `list_policy_cases` producto por producto (sin duplicar su
-     lógica) — es rápido gracias al pool de conexión de `db.py`: medido
-     contra SIT real, 40 casos de los 20 productos de Car_Ind (`scope=all`,
-     `per_product=2`) en 16s; solo daños (11 productos) en 9.6s. Cada caso
-     de esta tanda trae un campo extra `producto` (de qué producto salió),
-     mostrado en su propia columna en "Pólizas encontradas".
    - **"Por identificador"**: pegás un `policy_id`/`policy_no`/`policy_lot`/
      `engagement_id`/`quote_id` y llama a `/resolve_policy` (`resolver.py`),
      que es el mismo buscador de `generar-imprimibles` (`policy.py` +

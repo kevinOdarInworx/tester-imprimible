@@ -105,6 +105,8 @@
     }
     button.secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
     button.secondary:hover:not(:disabled) { background: var(--border); }
+    button.danger { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad-bd); }
+    button.danger:hover:not(:disabled) { background: var(--bad-bd); }
     button:hover:not(:disabled) { background: var(--primary-hover); }
     button:active:not(:disabled) { transform: translateY(1px); }
     button:disabled { opacity: .55; cursor: default; }
@@ -263,27 +265,6 @@
           </div>
         </div>
 
-        <div style="margin:14px 0">
-          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; text-transform:none; font-weight:600; color:var(--text); font-size:13.5px">
-            <input type="checkbox" id="prSampleAll" style="width:auto" />
-            Muestrear todos los productos (en vez de elegir uno)
-          </label>
-        </div>
-        <div class="config-grid" id="prSampleFields" style="display:none; grid-template-columns:1fr 160px">
-          <div>
-            <label for="prScope">Alcance</label>
-            <select id="prScope">
-              <option value="all">Todos los productos</option>
-              <option value="autos">Solo Autos</option>
-              <option value="danios">Solo Daños</option>
-            </select>
-          </div>
-          <div>
-            <label for="prPerProduct">Casos por producto</label>
-            <input id="prPerProduct" type="number" value="2" min="1" max="10" />
-          </div>
-        </div>
-
         <div style="margin-top:14px">
           <button id="btnBuscarPolizas">Buscar pólizas</button>
         </div>
@@ -328,15 +309,45 @@
           <input id="reportB" placeholder="Ej: Car_Mul_V3" autocomplete="off" />
           <div class="dropdown-menu" id="reportBMenu"></div>
         </div>
-        <div>
+        <div id="limitField">
           <label for="limit">Casos</label>
           <input id="limit" type="number" value="5" min="1" max="30" />
         </div>
         <div></div>
       </div>
+
+      <div style="margin:14px 0">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; text-transform:none; font-weight:600; color:var(--text); font-size:13.5px">
+          <input type="checkbox" id="cmpSampleAll" style="width:auto" />
+          Muestrear todos los productos (en vez de usar CAR_MUL_VIEW)
+        </label>
+      </div>
+      <div class="config-grid" id="cmpSampleFields" style="display:none; grid-template-columns:1fr 1fr 160px">
+        <div>
+          <label for="cmpFamily">Familia</label>
+          <select id="cmpFamily">
+            <option value="Car_Ind">Car_Ind (póliza emitida)</option>
+            <option value="Cot_Ind">Cot_Ind (cotización)</option>
+          </select>
+        </div>
+        <div>
+          <label for="cmpScope">Alcance</label>
+          <select id="cmpScope">
+            <option value="all">Todos los productos</option>
+            <option value="autos">Solo Autos</option>
+            <option value="danios">Solo Daños</option>
+          </select>
+        </div>
+        <div>
+          <label for="cmpPerProduct">Casos por producto</label>
+          <input id="cmpPerProduct" type="number" value="2" min="1" max="10" />
+        </div>
+      </div>
+
       <div style="margin-top:14px; display:flex; gap:10px;">
         <button id="btnBuscar">Buscar casos</button>
         <button id="btnRun" class="secondary" disabled>Ejecutar comparación</button>
+        <button id="btnStop" class="danger" style="display:none;">Detener</button>
       </div>
       <div class="hint" id="hint">Los casos salen de INSOR_GDS.CAR_MUL_VIEW, filtrados siempre por POLICY_ID (la vista es cara sin filtro), así que buscar casos puede tardar varios segundos por candidato.</div>
     </div>
@@ -346,12 +357,10 @@
       <div class="stats" id="runStats"></div>
       <button id="btnRerun" class="secondary" style="display:none; margin-bottom:14px;">Reejecutar casos</button>
       <div class="cases-wrap">
-        <table class="cases">
+        <table class="cases centered">
           <thead>
             <tr>
               <th style="width:30px"><input type="checkbox" id="checkAll" checked /></th>
-              <th>Póliza</th>
-              <th>Endoso</th>
               <th>Parámetros OIC</th>
               <th>Producto</th>
               <th>Estado</th>
@@ -371,13 +380,20 @@
   <script>
     const $ = (id) => document.getElementById(id);
     const envEl = $("env"), reportAEl = $("reportA"), reportBEl = $("reportB"), limitEl = $("limit");
-    const btnBuscar = $("btnBuscar"), btnRun = $("btnRun"), hintEl = $("hint");
+    const btnBuscar = $("btnBuscar"), btnRun = $("btnRun"), btnStop = $("btnStop"), hintEl = $("hint");
+    // Estado de "Detener": stopRequested corta el loop de ejecutar() antes del
+    // proximo caso; activeAbortController cancela el fetch en curso (algunos
+    // casos tardan 30-45s por lado, asi que sin abort el boton tardaria lo
+    // mismo en surtir efecto que esperar a que termine solo).
+    let stopRequested = false;
+    let activeAbortController = null;
     const casesCard = $("casesCard"), casesBody = $("casesBody"), checkAll = $("checkAll"), runStats = $("runStats");
     const btnRerun = $("btnRerun");
     const prFamily = $("prFamily"), prLimit = $("prLimit");
     const btnBuscarPolizas = $("btnBuscarPolizas"), prHint = $("prHint");
-    const prSampleAll = $("prSampleAll"), prSampleFields = $("prSampleFields");
-    const prScope = $("prScope"), prPerProduct = $("prPerProduct");
+    const limitField = $("limitField");
+    const cmpSampleAll = $("cmpSampleAll"), cmpSampleFields = $("cmpSampleFields");
+    const cmpFamily = $("cmpFamily"), cmpScope = $("cmpScope"), cmpPerProduct = $("cmpPerProduct");
     const prResultsCard = $("prResultsCard"), prResultsBody = $("prResultsBody"), btnUsarPolizas = $("btnUsarPolizas");
     const prResultsHead = $("prResultsHead");
     const tabBtnProducto = $("tabBtnProducto"), tabBtnIdentificador = $("tabBtnIdentificador");
@@ -639,6 +655,7 @@
     btnBuscar.addEventListener("click", buscarCasos);
     btnRun.addEventListener("click", ejecutar);
     btnRerun.addEventListener("click", ejecutar);
+    btnStop.addEventListener("click", detener);
     btnBuscarPolizas.addEventListener("click", buscarPolizas);
     checkAll.addEventListener("change", () => {
       casesBody.querySelectorAll(".rowCheck").forEach(cb => cb.checked = checkAll.checked);
@@ -648,7 +665,7 @@
     // comparacion) queda bloqueado hasta que se elige uno — antes tirar
     // "Ambiente invalido." recien al intentar usarlo era mas confuso que
     // simplemente no dejar tocarlo todavia.
-    const envGatedControls = [prFamily, prLimit, btnBuscarPolizas, polIdent, btnResolverPoliza, reportAEl, reportBEl, limitEl, btnBuscar, prSampleAll, prScope, prPerProduct];
+    const envGatedControls = [prFamily, prLimit, btnBuscarPolizas, polIdent, btnResolverPoliza, reportAEl, reportBEl, limitEl, btnBuscar, cmpSampleAll, cmpFamily, cmpScope, cmpPerProduct];
     function setEnvGatedEnabled(enabled) {
       envGatedControls.forEach(el => { el.disabled = !enabled; });
       ddProducto.setDisabled(!enabled);
@@ -735,28 +752,25 @@
       }
     });
 
-    prSampleAll.addEventListener("change", () => {
-      const sampling = prSampleAll.checked;
-      ddProducto.setDisabled(sampling);
-      ddSubtipo.setDisabled(sampling);
-      prLimit.disabled = sampling;
-      prSampleFields.style.display = sampling ? "grid" : "none";
+    cmpSampleAll.addEventListener("change", () => {
+      const sampling = cmpSampleAll.checked;
+      cmpSampleFields.style.display = sampling ? "grid" : "none";
+      limitField.style.display = sampling ? "none" : "block";
+      limitEl.disabled = sampling;
+      hintEl.textContent = sampling
+        ? "Se toman N casos de cada producto del catálogo (según el alcance elegido: todos, solo autos o solo daños), para tener cobertura amplia en una sola tanda."
+        : "Los casos salen de INSOR_GDS.CAR_MUL_VIEW, filtrados siempre por POLICY_ID (la vista es cara sin filtro), así que buscar casos puede tardar varios segundos por candidato.";
     });
 
     async function buscarPolizas() {
-      const sampling = prSampleAll.checked;
-      if (!sampling && !selectedProductCodes.length) { prHint.innerHTML = '<span class="error">Elegí un producto.</span>'; return; }
+      if (!selectedProductCodes.length) { prHint.innerHTML = '<span class="error">Elegí un producto.</span>'; return; }
       btnBuscarPolizas.disabled = true; btnBuscarPolizas.textContent = "Buscando…";
       prResultsCard.style.display = "none";
-      prHint.innerHTML = '<span class="spinner"></span> Consultando pólizas (tunel SSH + Oracle, puede tardar — muestrear todos los productos pega una consulta por cada uno)…';
+      prHint.innerHTML = '<span class="spinner"></span> Consultando pólizas (tunel SSH + Oracle, puede tardar)…';
       try {
-        const url = sampling ? "/policy_cases_sample" : "/policy_cases";
-        const body = sampling
-          ? { env: envEl.value, family: prFamily.value, scope: prScope.value, per_product: parseInt(prPerProduct.value || "2", 10) }
-          : { env: envEl.value, family: prFamily.value, product_codes: selectedProductCodes, limit: parseInt(prLimit.value || "5", 10) };
-        const res = await fetch(url, {
+        const res = await fetch("/policy_cases", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify({ env: envEl.value, family: prFamily.value, product_codes: selectedProductCodes, limit: parseInt(prLimit.value || "5", 10) }),
         });
         const data = await res.json();
         if (!res.ok) { prHint.innerHTML = '<span class="error">' + (data.error || "Error") + '</span>'; return; }
@@ -822,20 +836,29 @@
     });
 
     async function buscarCasos() {
+      const sampling = cmpSampleAll.checked;
       btnBuscar.disabled = true; btnBuscar.textContent = "Buscando…";
       btnRun.disabled = true;
       casesCard.style.display = "none";
-      hintEl.innerHTML = '<span class="spinner"></span> Consultando candidatos y filtrando por CAR_MUL_VIEW (puede tardar)…';
+      hintEl.innerHTML = sampling
+        ? '<span class="spinner"></span> Muestreando productos (una consulta por cada uno, puede tardar)…'
+        : '<span class="spinner"></span> Consultando candidatos y filtrando por CAR_MUL_VIEW (puede tardar)…';
       try {
-        const res = await fetch("/cases", {
+        const url = sampling ? "/policy_cases_sample" : "/cases";
+        const body = sampling
+          ? { env: envEl.value, family: cmpFamily.value, scope: cmpScope.value, per_product: parseInt(cmpPerProduct.value || "2", 10) }
+          : { env: envEl.value, limit: parseInt(limitEl.value || "5", 10) };
+        const res = await fetch(url, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ env: envEl.value, limit: parseInt(limitEl.value || "5", 10) }),
+          body: JSON.stringify(body),
         });
         const data = await res.json();
         if (!res.ok) { hintEl.innerHTML = '<span class="error">' + (data.error || "Error") + '</span>'; return; }
         cases = data.cases || [];
         if (!cases.length) {
-          hintEl.innerHTML = '<span class="error">No se encontraron casos en CAR_MUL_VIEW para los candidatos probados.</span>';
+          hintEl.innerHTML = sampling
+            ? '<span class="error">No se encontraron casos para los productos del alcance elegido.</span>'
+            : '<span class="error">No se encontraron casos en CAR_MUL_VIEW para los candidatos probados.</span>';
           return;
         }
         hintEl.textContent = `${cases.length} caso(s) encontrados.`;
@@ -849,16 +872,16 @@
       }
     }
 
-    function endosoLabel(c) {
-      if (c.annex_id != null) return c.annex_id;
-      if (c.quote_id != null) return `cotización ${c.quote_id}`;
-      return "—";
-    }
-
     function paramsLabel(c) {
       // Uno abajo del otro (no " · " en la misma linea): la columna ocupa
-      // menos ancho y deja mas espacio a Tiempo A/B/Mejora/PDF.
-      return (c.params || []).map((v, i) => `string_param${i + 1}=${v}`).join("<br>");
+      // menos ancho y deja mas espacio a Tiempo A/B/Mejora/PDF. Se nombra
+      // cada string_param con lo que realmente representa (en vez de un
+      // generico "string_param1/2") para no tener que adivinarlo ni repetir
+      // poliza/endoso en columnas aparte.
+      if (c.quote_id != null) return `quote_id=${c.quote_id}`;
+      const policyId = c.params && c.params[0] != null ? c.params[0] : c.policy_id;
+      const annexId = c.annex_id != null ? c.annex_id : (c.params ? c.params[1] : undefined);
+      return `policy_id=${policyId ?? "—"}<br>annex_id=${annexId ?? "—"}`;
     }
 
     function renderCases() {
@@ -867,8 +890,6 @@
       casesBody.innerHTML = cases.map((c, i) => `
         <tr data-idx="${i}">
           <td><input type="checkbox" class="rowCheck" checked /></td>
-          <td>${c.no_poliza || c.policy_id}</td>
-          <td>${endosoLabel(c)}</td>
           <td class="mono muted">${paramsLabel(c)}</td>
           <td>${c.producto ?? "—"}</td>
           <td class="statusCell"><span class="pill pill-miss">pendiente</span></td>
@@ -900,20 +921,45 @@
       return `<span style="color:var(--bad)">${pctTxt} más lento</span>`;
     }
 
+    function detener() {
+      stopRequested = true;
+      btnStop.disabled = true; btnStop.textContent = "Deteniendo…";
+      if (activeAbortController) activeAbortController.abort();
+    }
+
+    function resetRow(tr) {
+      tr.querySelector(".statusCell").innerHTML = '<span class="pill pill-miss">pendiente</span>';
+      tr.querySelector(".orderCell").textContent = "—";
+      tr.querySelector(".timeA").textContent = "—";
+      tr.querySelector(".timeB").textContent = "—";
+      tr.querySelector(".speedup").innerHTML = "—";
+      tr.querySelector(".diffCell").innerHTML = "";
+    }
+
     async function ejecutar() {
+      stopRequested = false;
       btnRun.disabled = true; btnRun.textContent = "Ejecutando…";
       btnBuscar.disabled = true;
       btnRerun.disabled = true; btnRerun.style.display = "none";
+      btnStop.style.display = "inline-block"; btnStop.disabled = false; btnStop.textContent = "Detener";
       const rows = [...casesBody.querySelectorAll("tr")].filter(tr => tr.querySelector(".rowCheck").checked);
+      // Al reejecutar, las filas que todavia no le toca turno seguian
+      // mostrando el resultado de la corrida anterior (solo se tocaba la
+      // fila en curso), lo que parecia una fila "colgada" mientras las de
+      // mas abajo ya tenian resultado — eran datos viejos, no nuevos.
+      rows.forEach(resetRow);
+      runStats.innerHTML = "";
       let ok = 0, bad = 0, err = 0;
       let speedups = [];
 
       for (let i = 0; i < rows.length; i++) {
+        if (stopRequested) break;
         const tr = rows[i];
         const idx = parseInt(tr.dataset.idx, 10);
         const c = cases[idx];
         const statusCell = tr.querySelector(".statusCell");
         statusCell.innerHTML = '<span class="spinner"></span> ejecutando…';
+        activeAbortController = new AbortController();
         try {
           // Alternar quién se pide primero: el primero de los dos se beneficia
           // del buffer cache de Oracle que deja tibio el segundo (misma poliza),
@@ -924,6 +970,7 @@
               env: envEl.value, report_a: reportAEl.value.trim(), report_b: reportBEl.value.trim(),
               params: c.params, swap_order: (i % 2 === 1),
             }),
+            signal: activeAbortController.signal,
           });
           const data = await res.json();
           if (!res.ok) { statusCell.innerHTML = `<span class="pill pill-bad">✕ ${data.error || "error"}</span>`; err++; continue; }
@@ -933,8 +980,18 @@
           else if (data.diff && data.diff.identical) { ok++; if (data.a.elapsed && data.b.elapsed) speedups.push(speedupPct(data.a.elapsed, data.b.elapsed)); }
           else { bad++; }
         } catch (e) {
+          if (e.name === "AbortError") { statusCell.innerHTML = '<span class="pill pill-warn">⊘ cancelado</span>'; break; }
           statusCell.innerHTML = `<span class="pill pill-bad">✕ error de red</span>`;
           err++;
+        }
+        renderStats(ok, bad, err, rows.length, speedups);
+      }
+      activeAbortController = null;
+
+      if (stopRequested) {
+        for (const tr of rows) {
+          const statusCell = tr.querySelector(".statusCell");
+          if (statusCell.textContent.trim() === "pendiente") statusCell.innerHTML = '<span class="pill pill-warn">⊘ cancelado</span>';
         }
         renderStats(ok, bad, err, rows.length, speedups);
       }
@@ -942,6 +999,7 @@
       btnRun.disabled = false; btnRun.textContent = "Ejecutar comparación";
       btnBuscar.disabled = false;
       btnRerun.disabled = false; btnRerun.style.display = "inline-block";
+      btnStop.style.display = "none"; btnStop.disabled = false; btnStop.textContent = "Detener";
     }
 
     function renderStats(ok, bad, err, total, speedups) {
