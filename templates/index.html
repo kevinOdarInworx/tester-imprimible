@@ -178,6 +178,14 @@
     .tab-btn:hover:not(:disabled) { background: none; color: var(--text); }
     .tab-btn.active { color: var(--primary); }
     .tab-btn.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--primary); border-radius: 2px; }
+
+    #imgDropZone {
+      border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 18px 16px;
+      text-align: center; cursor: pointer; color: var(--text-muted); font-size: 13px; transition: border-color .15s, background .15s;
+    }
+    #imgDropZone:hover, #imgDropZone:focus { border-color: var(--primary); outline: none; }
+    #imgDropZone.dragover { border-color: var(--primary); background: var(--primary-soft); }
+    .linklike-inline { color: var(--primary); text-decoration: underline; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -248,6 +256,15 @@
           <button id="btnResolverPoliza">Resolver póliza</button>
         </div>
         <div class="hint" id="polHint">Mismo buscador que generar-imprimibles: prueba policy_id/policy_no/policy_lot directo, y si no encuentra nada, si es un engagement_id de autos multinciso o un quote_id de cotización. Tampoco ejecuta nada por sí solo.</div>
+
+        <div style="margin-top:18px">
+          <label>O extraer el identificador de una imagen (captura de pantalla)</label>
+          <div id="imgDropZone" tabindex="0">
+            Pegá una imagen (Ctrl+V) acá, arrastrala, o <span class="linklike-inline">elegí un archivo</span>
+            <input type="file" id="imgFileInput" accept="image/*" style="display:none" />
+          </div>
+          <div class="hint" id="ocrHint"></div>
+        </div>
       </div>
     </div>
 
@@ -336,6 +353,84 @@
     const tabBtnProducto = $("tabBtnProducto"), tabBtnIdentificador = $("tabBtnIdentificador");
     const panelProducto = $("panelProducto"), panelIdentificador = $("panelIdentificador");
     const polIdent = $("polIdent"), btnResolverPoliza = $("btnResolverPoliza"), polHint = $("polHint");
+    const imgDropZone = $("imgDropZone"), imgFileInput = $("imgFileInput"), ocrHint = $("ocrHint");
+
+    // --- OCR de imagen (Tesseract.js por CDN, cargado recien al primer uso:
+    // es la unica dependencia externa de esta app, todo lo demas es local).
+    let tesseractLoadPromise = null;
+    function ensureTesseract() {
+      if (window.Tesseract) return Promise.resolve();
+      if (!tesseractLoadPromise) {
+        tesseractLoadPromise = new Promise((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+          s.onload = resolve;
+          s.onerror = () => reject(new Error("No se pudo cargar Tesseract.js (¿sin internet?)"));
+          document.head.appendChild(s);
+        });
+      }
+      return tesseractLoadPromise;
+    }
+
+    imgDropZone.addEventListener("click", () => imgFileInput.click());
+    imgDropZone.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); imgFileInput.click(); } });
+    imgFileInput.addEventListener("change", () => {
+      const file = imgFileInput.files[0];
+      if (file) handleOcrImage(file);
+    });
+    imgDropZone.addEventListener("dragover", (e) => { e.preventDefault(); imgDropZone.classList.add("dragover"); });
+    imgDropZone.addEventListener("dragleave", () => imgDropZone.classList.remove("dragover"));
+    imgDropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      imgDropZone.classList.remove("dragover");
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith("image/")) handleOcrImage(file);
+    });
+    // Ctrl+V en cualquier lado de la pagina, pero solo actua si hay una
+    // imagen en el portapapeles Y la pestaña "Por identificador" esta
+    // activa (si no, no interfiere con pegar texto en otro lado).
+    document.addEventListener("paste", (e) => {
+      if (panelIdentificador.style.display === "none") return;
+      const items = (e.clipboardData || window.clipboardData || {}).items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type && item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) { e.preventDefault(); handleOcrImage(file); }
+          return;
+        }
+      }
+    });
+
+    async function handleOcrImage(file) {
+      ocrHint.innerHTML = '<span class="spinner"></span> Cargando OCR…';
+      try {
+        await ensureTesseract();
+        const { data } = await Tesseract.recognize(file, "eng", {
+          logger: (m) => {
+            if (m.status === "recognizing text") {
+              ocrHint.innerHTML = `<span class="spinner"></span> Leyendo imagen… ${Math.round((m.progress || 0) * 100)}%`;
+            }
+          },
+        });
+        const text = data.text || "";
+        // Prioridad al formato policy_no/policy_lot (con "/", mas especifico
+        // y menos ambiguo que una tira larga de digitos suelta).
+        const slash = text.match(/\d+\/\d+\/\d+/g);
+        const digits = text.match(/\b\d{9,}\b/g);
+        const match = (slash && slash[0]) || (digits && digits[0]);
+        if (match) {
+          polIdent.value = match;
+          ocrHint.innerHTML = `Extraído de la imagen: <strong>${escapeHtml(match)}</strong> — revisá y apretá "Resolver póliza".`;
+        } else {
+          ocrHint.innerHTML = `<span class="error">No se encontró ningún identificador reconocible en la imagen.</span>` +
+            `<details style="margin-top:6px"><summary class="muted" style="cursor:pointer">Ver texto leído</summary>` +
+            `<pre style="white-space:pre-wrap;font-size:11px;color:var(--text-muted);margin:6px 0 0">${escapeHtml(text)}</pre></details>`;
+        }
+      } catch (err) {
+        ocrHint.innerHTML = `<span class="error">Error de OCR: ${escapeHtml(String(err))}</span>`;
+      }
+    }
 
     tabBtnProducto.addEventListener("click", () => switchInsumosTab("producto"));
     tabBtnIdentificador.addEventListener("click", () => switchInsumosTab("identificador"));

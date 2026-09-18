@@ -128,6 +128,23 @@ la vista puede tardar varios segundos, el default de casos es chico (5).
 - `templates/index.html` — frontend único, reutiliza los tokens de diseño
   (colores, pills, tabla de diff) de `versiones-vistas-imprimibles`.
 
+  **Única dependencia externa de toda la app**: en la pestaña "Por
+  identificador" se puede pegar (Ctrl+V), arrastrar o elegir una imagen
+  (p.ej. una captura de un imprimible ya generado) para extraerle el
+  identificador de póliza por OCR. Carga Tesseract.js perezosamente desde
+  `cdn.jsdelivr.net` recién al primer uso (nunca al cargar la página) — a
+  diferencia de todo lo demás en esta app y sus hermanas, esto **requiere
+  internet** (sin conexión, el dropzone tira el error "No se pudo cargar
+  Tesseract.js"). El texto reconocido se busca con dos regex, en orden de
+  prioridad: `\d+/\d+/\d+` (formato policy_no/policy_lot, más específico)
+  y si no aparece, una tira de 9+ dígitos seguidos (policy_id). El match se
+  precarga en el campo de identificador pero **no dispara la búsqueda
+  sola** — el usuario revisa y aprieta "Resolver póliza" a propósito, igual
+  que el resto de "Insumos". No se pudo probar el OCR de punta a punta en
+  esta sesión (necesita un navegador real con canvas/clipboard, no
+  disponible en las pruebas por Bash) — sí se verificó que la página
+  renderiza y que el cableado JS/CSS está completo.
+
 ## Convenciones
 
 - Comentarios y docstrings en español, estilo conciso.
