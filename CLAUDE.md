@@ -105,6 +105,17 @@ claro sin pensarlo si B fue más rápido o más lento) sigue siendo optimista
 para cualquier caso donde A salió primero, pero al menos no está sesgada
 sistemáticamente a favor de B.
 
+"B vs A en promedio" (`renderStats` en `index.html`) solo promedia los casos
+con diferencia real (`Math.abs(pct) >= FLAT_THRESHOLD`, 5%, el mismo umbral
+que decide si una fila se muestra como "≈ igual"). Antes promediaba todos los
+casos idénticos por igual, y como en una tanda típica varios casos caen en
+ruido de medición (0-3%, no una mejora ni regresión real), ese promedio
+mezclado quedaba diluido hacia 0 aunque los casos con diferencia real
+mostraran mejoras bastante más grandes (caso real: mezclado daba 8%, solo
+sobre los casos con diferencia real daba ~10-11%). Los casos "≈ igual"
+excluidos del promedio se cuentan aparte en el badge "Sin diferencia real"
+para que no desaparezcan silenciosamente.
+
 ## Por qué CAR_MUL_VIEW nunca se consulta sin `WHERE POLICY_ID`
 
 Según el README de `Car_Mul_V3`, `CAR_MUL_VIEW` "no tiene filtro propio": el
