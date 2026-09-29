@@ -221,12 +221,12 @@
       </div>
 
       <div id="panelIdentificador">
-        <label for="polIdent">Póliza (policy_id, policy_no, policy_lot, engagement_id o quote_id)</label>
+        <label for="polIdent">policy_id, policy_no, policy_lot, engagement_id o quote_id</label>
         <div style="display:flex; gap:10px; align-items:flex-start;">
           <div style="flex:1"><input id="polIdent" placeholder="Ej: 132510 | 06/956/132510 | 100000225422 | 0600201107/0135867/00" autocomplete="off" /></div>
           <button id="btnResolverPoliza">Resolver póliza</button>
         </div>
-        <div class="hint" id="polHint">Mismo buscador que generar-imprimibles: prueba policy_id/policy_no/policy_lot directo, y si no encuentra nada, si es un engagement_id de autos multinciso o un quote_id de cotización. Tampoco ejecuta nada por sí solo.</div>
+        <div class="hint" id="polHint"></div>
 
         <div style="margin-top:18px">
           <label>O extraer el identificador de una imagen (captura de pantalla)</label>
@@ -291,9 +291,25 @@
           <tbody id="prResultsBody"></tbody>
         </table>
       </div>
-      <div style="margin-top:14px">
-        <button id="btnUsarPolizas" class="secondary">Usar estas pólizas como casos de prueba de la comparación ↓</button>
+    </div>
+
+    <div class="card" id="annexesCard" style="display:none">
+      <h2>Endosos</h2>
+      <div class="cases-wrap">
+        <table class="cases centered">
+          <thead>
+            <tr>
+              <th>Policy ID</th>
+              <th>Annex ID</th>
+              <th>Annex No</th>
+              <th>Tipo endoso</th>
+              <th>Tipificación</th>
+            </tr>
+          </thead>
+          <tbody id="annexesBody"></tbody>
+        </table>
       </div>
+      <div class="hint" id="annexesHint"></div>
     </div>
 
     <div class="card">
@@ -400,8 +416,9 @@
     const limitField = $("limitField");
     const cmpSampleAll = $("cmpSampleAll"), cmpSampleFields = $("cmpSampleFields");
     const cmpFamily = $("cmpFamily"), cmpScope = $("cmpScope"), cmpPerProduct = $("cmpPerProduct");
-    const prResultsCard = $("prResultsCard"), prResultsBody = $("prResultsBody"), btnUsarPolizas = $("btnUsarPolizas");
+    const prResultsCard = $("prResultsCard"), prResultsBody = $("prResultsBody");
     const prResultsHead = $("prResultsHead");
+    const annexesCard = $("annexesCard"), annexesBody = $("annexesBody"), annexesHint = $("annexesHint");
     const tabBtnProducto = $("tabBtnProducto"), tabBtnIdentificador = $("tabBtnIdentificador");
     const panelProducto = $("panelProducto"), panelIdentificador = $("panelIdentificador");
     const polIdent = $("polIdent"), btnResolverPoliza = $("btnResolverPoliza"), polHint = $("polHint");
@@ -548,7 +565,8 @@
       if (!value) { polHint.innerHTML = '<span class="error">Ingresá un identificador.</span>'; return; }
       btnResolverPoliza.disabled = true; btnResolverPoliza.textContent = "Resolviendo…";
       prResultsCard.style.display = "none";
-      polHint.innerHTML = '<span class="spinner"></span> Consultando (tunel SSH + Oracle, puede tardar)…';
+      annexesCard.style.display = "none";
+      polHint.innerHTML = '<span class="spinner"></span> Cargando…';
       try {
         const res = await fetch("/resolve_policy", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -557,7 +575,6 @@
         const data = await res.json();
         if (!res.ok) { polHint.innerHTML = '<span class="error">' + (data.error || "Error") + '</span>'; return; }
         policyResults = data.cases || [];
-        policyResultsSource = "identificador";
         if (!policyResults.length) {
           polHint.innerHTML = data.engagement_id
             ? `<span class="error">Es un engagement_id de autos multinciso (<strong>${data.engagement_id}</strong>) pero no tiene pólizas dependientes.</span>`
@@ -571,10 +588,49 @@
           : `${policyResults.length} póliza(s) encontradas.`;
         renderPolicyResults();
         prResultsCard.style.display = "block";
+        cargarEndosos([...new Set(policyResults.map(p => p.policy_id))]);
       } catch (err) {
         polHint.innerHTML = '<span class="error">Error de red: ' + err + '</span>';
       } finally {
         btnResolverPoliza.disabled = false; btnResolverPoliza.textContent = "Resolver póliza";
+      }
+    }
+
+    // Igual que la caratula de generar-imprimibles, que ademas de la emision
+    // ofrece una version por cada endoso — acá solo se listan (informativo,
+    // como el resto de "Insumos"), no arma casos de prueba por si solo. Solo
+    // se dispara desde "Por identificador": en "Por producto"/muestreo serian
+    // N consultas extra (una por poliza encontrada) para un listado que ahi no
+    // se pidio.
+    async function cargarEndosos(policyIds) {
+      if (!policyIds.length) { annexesCard.style.display = "none"; return; }
+      annexesCard.style.display = "block";
+      annexesBody.innerHTML = "";
+      annexesHint.innerHTML = '<span class="spinner"></span> Consultando endosos…';
+      try {
+        const res = await fetch("/policy_annexes", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ env: envEl.value, policy_ids: policyIds }),
+        });
+        const data = await res.json();
+        if (!res.ok) { annexesHint.innerHTML = '<span class="error">' + (data.error || "Error") + '</span>'; return; }
+        const annexes = data.annexes || [];
+        if (!annexes.length) {
+          annexesHint.textContent = "Esta póliza no tiene endosos (solo emisión).";
+          return;
+        }
+        annexesHint.textContent = `${annexes.length} endoso(s) encontrados.`;
+        annexesBody.innerHTML = annexes.map(a => `
+          <tr>
+            <td>${a.policy_id}</td>
+            <td>${a.annex_id}</td>
+            <td>${a.annex_no ?? "—"}</td>
+            <td>${a.tipo_endoso ?? "—"}</td>
+            <td>${a.tipificacion ?? "—"}</td>
+          </tr>
+        `).join("");
+      } catch (err) {
+        annexesHint.innerHTML = '<span class="error">Error de red: ' + err + '</span>';
       }
     }
 
@@ -591,8 +647,7 @@
     });
 
     let cases = []; // [{policy_id, annex_id, no_poliza, producto, params, ...}]
-    let policyResults = []; // ultima tanda de /policy_cases o /resolve_policy (informativo, ver btnUsarPolizas)
-    let policyResultsSource = null; // "producto" | "identificador" — de donde salio policyResults
+    let policyResults = []; // ultima tanda de /policy_cases o /resolve_policy (solo informativo)
     let products = []; // [{product_code, product_text, subtipo}]
     let productsLoadedFor = null; // ambiente para el que ya se cargo el catalogo
     let selectedProductCodes = []; // codigos a usar en /policy_cases (uno, o varios si es "Todos")
@@ -773,7 +828,8 @@
       if (!selectedProductCodes.length) { prHint.innerHTML = '<span class="error">Elegí un producto.</span>'; return; }
       btnBuscarPolizas.disabled = true; btnBuscarPolizas.textContent = "Buscando…";
       prResultsCard.style.display = "none";
-      prHint.innerHTML = '<span class="spinner"></span> Consultando pólizas (tunel SSH + Oracle, puede tardar)…';
+      annexesCard.style.display = "none";
+      prHint.innerHTML = '<span class="spinner"></span> Cargando…';
       try {
         const res = await fetch("/policy_cases", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -782,7 +838,6 @@
         const data = await res.json();
         if (!res.ok) { prHint.innerHTML = '<span class="error">' + (data.error || "Error") + '</span>'; return; }
         policyResults = data.cases || [];
-        policyResultsSource = "producto";
         if (!policyResults.length) {
           prHint.innerHTML = '<span class="error">No se encontraron pólizas para ese producto/estado.</span>';
           return;
@@ -829,18 +884,6 @@
         </tr>
       `).join("");
     }
-
-    btnUsarPolizas.addEventListener("click", () => {
-      // Traspaso explicito: buscar pólizas es solo para conocerlas (con sus
-      // datos de policy), no dispara la comparación por si sola. Recien acá
-      // se decide usarlas como casos de prueba.
-      cases = policyResults;
-      if (policyResultsSource === "producto") reportAEl.value = prFamily.value;
-      renderCases();
-      casesCard.style.display = "block";
-      btnRun.disabled = false;
-      casesCard.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
 
     function cancelarBusqueda() {
       btnCancelBuscar.disabled = true; btnCancelBuscar.textContent = "Cancelando…";

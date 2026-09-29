@@ -42,7 +42,7 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
      diferencia de esa búsqueda — que es solo para *conocer* pólizas, ver
      más abajo — el muestreo no tiene otro uso que alimentar la comparación:
      escribe directo en "Casos de prueba", sin pasar por "Pólizas
-     encontradas" ni por el traspaso explícito.
+     encontradas".
    - **"Por producto"** (Car_Ind/Cot_Ind u otras familias "individuales"):
      elegís Familia + Producto + Subtipo y llama a `/policy_cases`
      (`list_policy_cases`), que filtra `insis_gen_v10.policy` por
@@ -65,18 +65,28 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
      un reporte puntual), con su `eng_pol_type` (`MASTER`/`DEPENDENT`,
      confirmado contra un engagement real en SIT).
 
+     Después de resolver, el frontend encadena `/policy_annexes`
+     (`list_annexes` en `resolver.py`) con los `policy_id` encontrados y
+     muestra la tarjeta "Endosos" (annex_id, annex_no, tipo endoso,
+     tipificación) — igual que la carátula de `generar-imprimibles`, que
+     ofrece una versión por endoso además de la emisión. Sale de
+     `insor_gds.annex_details_view` y no de `CONSUTA_DE_ENDOSOS_VIEW` (la que
+     usa `_endosos` en generar-imprimibles): esa es un subset de esta sin
+     `NAME` (tipificación, de HT_ANNEX_REASON). Se probó mostrando también
+     `TEXTO_ENDOSO` ("qué endoso es"), pero se sacó a pedido del usuario. Como
+     la vista, excluye endosos con `annex_state` -3/-30. Es solo informativo
+     (no arma casos con ese annex_id) y solo se
+     dispara desde "Por identificador": en "Por producto" serían N consultas
+     extra por un listado que ahí no se pidió.
+
    Ambas pestañas de "Insumos" alimentan la misma tabla "Pólizas encontradas"
-   y son **semánticamente independientes de la comparación**, aunque
-   internamente reusen la misma tanda de datos para no duplicar la consulta:
-   buscan pólizas para *conocerlas* (con `policy_id`, `policy_no`,
-   `policy_lot`, `insr_type`, `policy_state`, y `quote_id` si aplica) sin
-   tocar la sección de comparación. Solo si el usuario aprieta explícitamente
-   "Usar estas pólizas como casos de prueba" esa tanda pasa a ser `cases` y
-   aparece en "Casos de prueba" — nunca como efecto automático de buscar.
-   `/cases` (multinciso), en cambio, alimenta `cases`/"Casos de prueba"
-   directo — nunca pasó por "Pólizas encontradas" ni tuvo el paso explícito
-   de "Usar estas pólizas..." (es el flujo más viejo de la app, de antes de
-   que existiera "Insumos"; no se tocó al revertir el intento de moverlo).
+   y son **independientes de la comparación**: buscan pólizas solo para
+   *conocerlas* (con `policy_id`, `policy_no`, `policy_lot`, `insr_type`,
+   `policy_state`, y `quote_id` si aplica) y no tocan "Casos de prueba".
+   Hubo un botón "Usar estas pólizas como casos de prueba" que pasaba esa
+   tanda a `cases`, pero se sacó a pedido del usuario: los casos de prueba
+   salen solo de "Buscar casos" en "Configuración de la comparación"
+   (`/cases` o, con el muestreo tildado, `/policy_cases_sample`).
 
    Cualquiera sea el origen, cada caso trae un campo `params` ya armado con
    la forma exacta que espera OIC para esa familia (`[policy_id, annex_id]`
@@ -130,8 +140,8 @@ la vista puede tardar varios segundos, el default de casos es chico (5).
 ## Archivos clave
 
 - `app.py` — rutas Flask: `/`, `/cases`, `/products`, `/policy_cases`,
-  `/policy_cases_sample`, `/resolve_policy`, `/report_families`, `/run_case`,
-  `/pdf/<token>`.
+  `/policy_cases_sample`, `/resolve_policy`, `/policy_annexes`,
+  `/report_families`, `/run_case`, `/pdf/<token>`.
 - `cases.py` — descubrimiento de casos (`list_mul_cases`, `list_products`,
   `list_policy_cases`, `list_products_sample`), ver arriba.
 - `resolver.py` — buscador por identificador (`resolve`, con `lookup_policy`

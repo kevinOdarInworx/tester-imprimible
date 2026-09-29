@@ -13,6 +13,8 @@
 - /resolve_policy: busca una poliza por policy_id/policy_no/policy_lot/
   engagement_id/quote_id (el mismo buscador de generar-imprimibles, ver
   resolver.py), para la otra forma de conseguir insumos.
+- /policy_annexes: endosos de las polizas resueltas por identificador
+  (annex_details_view), solo informativo.
 - /report_families: nombres de carpeta bajo PRINTOUTS_DIR (printouts.py),
   para sugerir valores en los campos Reporte A/B.
 - /run_case: para un caso, pide el PDF a ambos reportes via OIC (reports.py),
@@ -35,7 +37,7 @@ from compare import compare_pdfs
 from config.environments import ENVIRONMENTS
 from printouts import PRINTOUTS_DIR, list_families as list_report_families
 from reports import OIC_PASSWORD, fetch_report
-from resolver import resolve as resolve_policy
+from resolver import list_annexes, resolve as resolve_policy
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -150,8 +152,8 @@ def resolve_policy_route():
     except Exception as exc:  # tunel / conexion / oracle
         return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
 
-    # Mismo formato de caso que /cases y /policy_cases, para reusar tal cual
-    # la tabla "Pólizas encontradas" y el traspaso a "Casos de prueba".
+    # Mismo formato de caso que /policy_cases, para reusar tal cual la tabla
+    # "Pólizas encontradas".
     # eng_pol_type solo viene poblado cuando el match salio de resolver un
     # engagement_id (ver list_engagement_policies en resolver.py).
     cases = [
@@ -174,6 +176,20 @@ def resolve_policy_route():
         "engagement_id": result.get("engagement_id"),
         "quote_id": result.get("quote_id"),
     })
+
+
+@app.route("/policy_annexes", methods=["POST"])
+def policy_annexes_route():
+    data = request.get_json(silent=True) or {}
+    env = data.get("env", "")
+    policy_ids = data.get("policy_ids") or []
+    if env not in ENVIRONMENTS:
+        return jsonify({"error": "Ambiente invalido."}), 400
+    try:
+        annexes = [a for pid in policy_ids for a in list_annexes(env, pid)]
+    except Exception as exc:  # tunel / conexion / oracle
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
+    return jsonify({"annexes": annexes})
 
 
 @app.route("/run_case", methods=["POST"])

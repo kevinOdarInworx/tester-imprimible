@@ -171,6 +171,38 @@ def list_engagement_policies(env_key: str, engagement_id) -> list[dict]:
             ]
 
 
+def list_annexes(env_key: str, policy_id) -> list[dict]:
+    """Endosos de una poliza. Sale de insor_gds.annex_details_view y no de
+    CONSUTA_DE_ENDOSOS_VIEW (la que usa _endosos en generar-imprimibles):
+    esa es un subset de esta y no expone la tipificacion (NAME: el motivo,
+    de HT_ANNEX_REASON), que afina al tipo_endoso (HST_ANNEX_TYPE, la
+    categoria general)."""
+    with get_connection(env_key) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT policy_id, annex_id, no_endoso, tipo_endoso, name "
+                "FROM insor_gds.annex_details_view "
+                "WHERE policy_id = :p "
+                "ORDER BY annex_id",
+                {"p": int(policy_id)},
+            )
+            cols = [d[0].lower() for d in cur.description]
+            rows = [
+                {col: _serialize(val) for col, val in zip(cols, record)}
+                for record in cur.fetchall()
+            ]
+    return [
+        {
+            "policy_id": r["policy_id"],
+            "annex_id": r["annex_id"],
+            "annex_no": r["no_endoso"],
+            "tipo_endoso": r["tipo_endoso"],
+            "tipificacion": r["name"],
+        }
+        for r in rows
+    ]
+
+
 def resolve(env_key: str, raw: str) -> dict:
     """Replica el orden de /resolve en generar-imprimibles/app.py: poliza
     directa (policy_id/policy_no/policy_lot) -> engagement_id (autos
