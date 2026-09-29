@@ -13,36 +13,34 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
    se pensó explícitamente; `Car_Mul_V3` hoy solo está desplegado en
    SIT/PREPROD, ver "Limitaciones conocidas"), arriba
    de todo, porque lo usan tanto la búsqueda de insumos como la ejecución.
+   Debajo, la página se divide en dos pestañas: "Buscar pólizas" (Insumos,
+   Pólizas encontradas, Endosos) y "Comparador" (Configuración de la
+   comparación, Casos de prueba). Cambiar de pestaña solo oculta/muestra:
+   una comparación en curso sigue corriendo.
 2. Para conseguir casos de prueba (pólizas reales) hay dos caminos, según la
    familia de imprimible:
-   - **Car_Mul / Car_Mul_V3** (multinciso): `/cases` (`list_mul_cases` en
-     `cases.py`) arma la tanda leyendo `INSOR_GDS.CAR_MUL_VIEW` — no vive en
-     "Insumos", tiene su propio buscador ("Buscar casos", sin "CAR_MUL_VIEW"
-     ni "Car_Mul" ni "multinciso" en el texto visible del botón — se le pidió
-     sacarle toda mención específica) en "Configuración de la comparación"
-     porque su elegibilidad depende de esa vista puntual, no de
-     producto/estado. El botón se probó moviéndolo a "Insumos" como una
-     tercera pestaña, pero se revirtió (el pedido era solo cambiarle el
-     nombre, no reubicarlo) — queda en su lugar original.
-
-     Ese mismo botón "Buscar casos" tiene un segundo modo: el checkbox
-     "Muestrear todos los productos" (con Familia + Alcance
-     Todos/Autos/Danios, mismo criterio que `_product()` de
+   - **"Buscar casos"** (pestaña "Comparador"): con Familia + Alcance
+     (Todos/Autos/Danios, mismo criterio que `_product()` de
      `generar-imprimibles/imprimibles.py`: `insr_type` arranca con "1" =
-     autos + Casos por producto) cambia la llamada de `/cases` a
-     `/policy_cases_sample` (`list_products_sample`), que junta unos pocos
-     casos de CADA producto del catálogo reusando `list_policy_cases`
-     producto por producto (sin duplicar su lógica) — es rápido gracias al
-     pool de conexión de `db.py`: medido contra SIT real, 40 casos de los 20
-     productos de Car_Ind (`scope=all`, `per_product=2`) en 16s; solo daños
-     (11 productos) en 9.6s. Cada caso trae un campo extra `producto` (de
-     qué producto salió), mostrado en su propia columna en "Casos de
-     prueba". Este control vive en "Configuración de la comparación" (no en
-     "Insumos" junto al resto de la búsqueda "Por producto") porque a
-     diferencia de esa búsqueda — que es solo para *conocer* pólizas, ver
-     más abajo — el muestreo no tiene otro uso que alimentar la comparación:
-     escribe directo en "Casos de prueba", sin pasar por "Pólizas
-     encontradas".
+     autos) + Casos por producto, llama a `/policy_cases_sample`
+     (`list_products_sample`), que junta unos pocos casos de CADA producto
+     del catálogo reusando `list_policy_cases` producto por producto (sin
+     duplicar su lógica) — es rápido gracias al pool de conexión de `db.py`:
+     medido contra SIT real, 40 casos de los 20 productos de Car_Ind
+     (`scope=all`, `per_product=2`) en 16s; solo daños (11 productos) en
+     9.6s. Cada caso trae un campo extra `producto` (de qué producto salió),
+     mostrado en su propia columna en "Casos de prueba". Escribe directo en
+     "Casos de prueba", sin pasar por "Pólizas encontradas".
+
+     Antes "Buscar casos" tenía un modo por defecto que leía
+     `INSOR_GDS.CAR_MUL_VIEW` (`/cases` → `list_mul_cases` en `cases.py`,
+     casos multinciso de Car_Mul, filtrando `cant_ubicaciones > 1`) y el
+     muestreo era un checkbox opcional con su propio campo "Casos". A pedido
+     del usuario se sacaron el checkbox y ese campo: el muestreo es ahora la
+     única forma de "Buscar casos". La ruta `/cases` y `list_mul_cases`
+     siguen en el backend pero la pantalla ya no las llama; para probar
+     Car_Mul con pólizas multinciso, buscarlas en "Buscar pólizas" y usar
+     "Usar estas pólizas en el comparador".
    - **"Por producto"** (Car_Ind/Cot_Ind u otras familias "individuales"):
      elegís Familia + Producto + Subtipo y llama a `/policy_cases`
      (`list_policy_cases`), que filtra `insis_gen_v10.policy` por
@@ -80,13 +78,19 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
      extra por un listado que ahí no se pidió.
 
    Ambas pestañas de "Insumos" alimentan la misma tabla "Pólizas encontradas"
-   y son **independientes de la comparación**: buscan pólizas solo para
+   y son **independientes de la comparación**: buscan pólizas para
    *conocerlas* (con `policy_id`, `policy_no`, `policy_lot`, `insr_type`,
-   `policy_state`, y `quote_id` si aplica) y no tocan "Casos de prueba".
-   Hubo un botón "Usar estas pólizas como casos de prueba" que pasaba esa
-   tanda a `cases`, pero se sacó a pedido del usuario: los casos de prueba
-   salen solo de "Buscar casos" en "Configuración de la comparación"
-   (`/cases` o, con el muestreo tildado, `/policy_cases_sample`).
+   `policy_state`, y `quote_id` si aplica) y no tocan "Casos de prueba" por
+   sí solas. Solo el botón "Usar estas pólizas en el comparador" (al final de
+   los resultados, visible únicamente después de una búsqueda con
+   resultados) pasa esa tanda a `cases` y cambia a la pestaña "Comparador".
+   Se deshabilita mientras corre una comparación o un "Buscar casos": con
+   las pestañas es fácil apretarlo desde "Buscar pólizas" en medio de una
+   corrida, y reemplazar `cases` ahí haría que el loop de `ejecutar()` lea
+   params de la tanda nueva para las filas viejas. La otra fuente de casos es
+   "Buscar casos" en "Configuración de la comparación"
+   (`/policy_cases_sample`). El botón se sacó una vez y se volvió a poner a
+   pedido del usuario.
 
    Cualquiera sea el origen, cada caso trae un campo `params` ya armado con
    la forma exacta que espera OIC para esa familia (`[policy_id, annex_id]`
@@ -127,6 +131,9 @@ excluidos del promedio se cuentan aparte en el badge "Sin diferencia real"
 para que no desaparezcan silenciosamente.
 
 ## Por qué CAR_MUL_VIEW nunca se consulta sin `WHERE POLICY_ID`
+
+(Aplica a `/cases`/`list_mul_cases`, que siguen en el backend aunque la
+pantalla ya no los llama — ver "Flujo".)
 
 Según el README de `Car_Mul_V3`, `CAR_MUL_VIEW` "no tiene filtro propio": el
 costo caro de la versión original (`LISTAGG` sobre toda `AGENTS_VIEW`, ~19-30s)
@@ -218,8 +225,10 @@ la vista puede tardar varios segundos, el default de casos es chico (5).
 
 ## Limitaciones conocidas
 
-- Familias soportadas para conseguir casos: `Car_Mul` (vía `CAR_MUL_VIEW`) y
-  `Car_Ind`/`Cot_Ind` (vía `insis_gen_v10.policy` + catálogo de producto).
+- Familias soportadas por "Buscar casos": `Car_Ind`/`Cot_Ind` (vía
+  `insis_gen_v10.policy` + catálogo de producto). `Car_Mul` vía
+  `CAR_MUL_VIEW` existe en el backend (`/cases`) pero la pantalla ya no lo
+  ofrece; para multinciso, llevar las pólizas desde "Buscar pólizas".
   Para otra familia (p.ej. `Cot_Mul`, `End_Ind`) hay que agregar su regla en
   `cases.py` — `reports.py` y `compare.py` ya son genéricos, no hace falta
   tocarlos.
