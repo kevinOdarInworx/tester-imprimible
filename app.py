@@ -19,6 +19,9 @@
   para sugerir valores en los campos Reporte A/B.
 - /run_case: para un caso, pide el PDF a ambos reportes via OIC (reports.py),
   mide cuanto tarda cada uno y diffea el texto extraido (compare.py).
+- /doc_resolve, /doc_for_policy, /doc_download: pestaña "Descargar
+  documentos" — que imprimibles tiene una poliza (documentos.py, port de
+  generar-imprimibles) y su descarga, avisando si el PDF vino en blanco.
 - /pdf/<token>: sirve el PDF de una corrida anterior (para verlo/descargarlo).
 
 Un solo usuario, sin persistencia entre reinicios: los PDFs de la corrida
@@ -33,8 +36,9 @@ import requests
 from flask import Flask, Response, abort, jsonify, render_template, request
 
 from cases import FAMILIES, list_mul_cases, list_policy_cases, list_products, list_products_sample
-from compare import compare_pdfs
+from compare import compare_pdfs, pdf_stats
 from config.environments import ENVIRONMENTS
+from documentos import REPORTS as DOC_REPORTS, blank_hint, compute_documents, resolve as resolve_documents
 from printouts import PRINTOUTS_DIR, list_families as list_report_families
 from reports import OIC_PASSWORD, fetch_report
 from resolver import list_annexes, resolve as resolve_policy
@@ -248,6 +252,83 @@ def run_case():
     result["diff"] = diff
     result["order"] = [side for side, _ in order]
     return jsonify(result)
+
+
+@app.route("/doc_resolve", methods=["POST"])
+def doc_resolve_route():
+    data = request.get_json(silent=True) or {}
+    env = data.get("env", "")
+    if env not in ENVIRONMENTS:
+        return jsonify({"error": "Ambiente invalido."}), 400
+    try:
+        return jsonify(resolve_documents(env, data.get("policy", "")))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # tunel / conexion / oracle
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
+
+
+@app.route("/doc_for_policy", methods=["POST"])
+def doc_for_policy_route():
+    """Documentos de una poliza puntual, cuando /doc_resolve encontro varias."""
+    data = request.get_json(silent=True) or {}
+    env = data.get("env", "")
+    policy = data.get("policy") or {}
+    if env not in ENVIRONMENTS:
+        return jsonify({"error": "Ambiente invalido."}), 400
+    if not policy.get("policy_id"):
+        return jsonify({"error": "Falta policy_id."}), 400
+    try:
+        return jsonify(compute_documents(env, policy))
+    except Exception as exc:
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
+
+
+@app.route("/doc_download", methods=["POST"])
+def doc_download_route():
+    data = request.get_json(silent=True) or {}
+    env = data.get("env", "")
+    report = data.get("report", "")
+    params = data.get("params") or []
+    if env not in ENVIRONMENTS:
+        return jsonify({"error": "Ambiente invalido."}), 400
+    if report not in DOC_REPORTS:
+        return jsonify({"error": f"Reporte desconocido: {report}"}), 400
+    if not OIC_PASSWORD:
+        return jsonify({"error": "OIC_PASSWORD no configurado en .env."}), 500
+
+    t0 = time.monotonic()
+    try:
+        resp = fetch_report(env, report, params)
+    except requests.RequestException as exc:
+        return jsonify({"error": f"Error llamando a OIC: {exc}"}), 502
+    elapsed = time.monotonic() - t0
+
+    if resp.status_code != 200:
+        detail = resp.text[:500].strip()
+        hint = None
+        if resp.status_code == 500 and not detail:
+            # OIC no devuelve la traza de Jasper: sin cuerpo es o reporte no
+            # desplegado en el ambiente o un jrxml que explota con estos datos.
+            hint = ("El reporte no está desplegado en este ambiente o el .jrxml falla con "
+                    "estos datos (OIC no da detalle).")
+        return jsonify({"error": f"OIC devolvio {resp.status_code}", "detail": detail,
+                        "hint": hint, "elapsed": elapsed}), 502
+
+    try:
+        pages, lines = pdf_stats(resp.content)
+    except Exception as exc:
+        return jsonify({"error": f"OIC devolvio algo que no es un PDF legible: {exc}"}), 502
+    blank = lines == 0
+    return jsonify({
+        "token": _store_pdf(resp.content),
+        "filename": f"{report}_{'_'.join(str(v) for v in params)}_{env}.pdf",
+        "size": len(resp.content),
+        "pages": pages,
+        "blank": blank,
+        "hint": blank_hint(report) if blank else None,
+        "elapsed": elapsed,
+    })
 
 
 @app.route("/pdf/<token>")

@@ -189,6 +189,21 @@
     #imgDropZone.dragover { border-color: var(--primary); background: var(--primary-soft); }
     #imgDropZone.disabled { opacity: .45; pointer-events: none; cursor: default; }
     .linklike-inline { color: var(--primary); text-decoration: underline; font-weight: 600; }
+
+    .doc-group + .doc-group { margin-top: 20px; }
+    .doc-group-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--text-muted); margin: 0 0 8px; }
+    .doc-label { font-size: 13.5px; font-weight: 600; margin: 12px 0 6px; }
+    .doc-group-title + .doc-label { margin-top: 0; }
+    .doc-row { display: flex; align-items: center; gap: 14px; padding: 11px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 8px; background: var(--surface-2); }
+    .doc-row.sub { margin-left: 16px; }
+    .doc-info { flex: 1; min-width: 0; }
+    .doc-t { font-size: 13.5px; font-weight: 600; }
+    .doc-s { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+    .doc-params { font-family: ui-monospace, SFMono-Regular, Consolas, "Courier New", monospace; font-size: 11.5px; color: var(--miss); margin-top: 3px; }
+    .doc-note { font-size: 12px; color: var(--warn); margin-top: 4px; }
+    .doc-result:not(:empty) { margin-top: 8px; font-size: 12.5px; }
+    .doc-result .pill { margin-right: 8px; }
+    a.doc-link { color: var(--primary); font-weight: 600; font-size: 12.5px; }
   </style>
 </head>
 <body>
@@ -216,6 +231,7 @@
     <div class="tabs" style="margin-bottom:18px">
       <button class="tab-btn active" id="pageTabBtnPolizas" type="button">Buscar pólizas</button>
       <button class="tab-btn" id="pageTabBtnComparador" type="button">Comparador</button>
+      <button class="tab-btn" id="pageTabBtnDocs" type="button">Descargar documentos</button>
     </div>
 
     <div id="pagePolizas">
@@ -394,6 +410,43 @@
       </div>
     </div>
     </div>
+
+    <div id="pageDocs" style="display:none">
+    <div class="card">
+      <h2>Descargar documentos</h2>
+      <label for="docIdent">policy_id, policy_no, policy_lot, engagement_id o quote_id</label>
+      <div style="display:flex; gap:10px; align-items:flex-start;">
+        <div style="flex:1"><input id="docIdent" placeholder="Ej: 132510 | 06/956/132510 | 100000225422 | 0600201107/0135867/00" autocomplete="off" /></div>
+        <button id="btnDocResolver">Buscar documentos</button>
+      </div>
+      <div class="hint" id="docHint"></div>
+    </div>
+
+    <div class="card" id="docMatchesCard" style="display:none">
+      <h2>Pólizas encontradas</h2>
+      <div class="cases-wrap">
+        <table class="cases centered">
+          <thead>
+            <tr>
+              <th>Policy ID</th>
+              <th>Policy No</th>
+              <th>Policy Lot</th>
+              <th>INSR_TYPE</th>
+              <th>Policy State</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="docMatchesBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" id="docListCard" style="display:none">
+      <h2>Documentos disponibles</h2>
+      <div class="stats" id="docMeta"></div>
+      <div id="docGroups"></div>
+    </div>
+    </div>
   </div>
 
   <script>
@@ -419,6 +472,9 @@
     const usarPolizasRow = $("usarPolizasRow"), btnUsarPolizas = $("btnUsarPolizas");
     const prResultsHead = $("prResultsHead");
     const annexesCard = $("annexesCard"), annexesBody = $("annexesBody"), annexesHint = $("annexesHint");
+    const docIdent = $("docIdent"), btnDocResolver = $("btnDocResolver"), docHint = $("docHint");
+    const docMatchesCard = $("docMatchesCard"), docMatchesBody = $("docMatchesBody");
+    const docListCard = $("docListCard"), docMeta = $("docMeta"), docGroups = $("docGroups");
     const tabBtnProducto = $("tabBtnProducto"), tabBtnIdentificador = $("tabBtnIdentificador");
     const panelProducto = $("panelProducto"), panelIdentificador = $("panelIdentificador");
     const polIdent = $("polIdent"), btnResolverPoliza = $("btnResolverPoliza"), polHint = $("polHint");
@@ -557,18 +613,19 @@
       tabBtnIdentificador.classList.toggle("active", !isProducto);
     }
 
-    // Solo oculta/muestra: una comparacion en curso sigue corriendo aunque se
-    // cambie a "Buscar pólizas".
-    const pageTabBtnPolizas = $("pageTabBtnPolizas"), pageTabBtnComparador = $("pageTabBtnComparador");
-    const pagePolizas = $("pagePolizas"), pageComparador = $("pageComparador");
-    pageTabBtnPolizas.addEventListener("click", () => switchPageTab("polizas"));
-    pageTabBtnComparador.addEventListener("click", () => switchPageTab("comparador"));
+    // Solo oculta/muestra: una comparacion o descarga en curso sigue
+    // corriendo aunque se cambie de pestaña.
+    const pageTabs = {
+      polizas: [$("pageTabBtnPolizas"), $("pagePolizas")],
+      comparador: [$("pageTabBtnComparador"), $("pageComparador")],
+      documentos: [$("pageTabBtnDocs"), $("pageDocs")],
+    };
+    for (const [key, [btn]] of Object.entries(pageTabs)) btn.addEventListener("click", () => switchPageTab(key));
     function switchPageTab(which) {
-      const isComparador = which === "comparador";
-      pageComparador.style.display = isComparador ? "block" : "none";
-      pagePolizas.style.display = isComparador ? "none" : "block";
-      pageTabBtnComparador.classList.toggle("active", isComparador);
-      pageTabBtnPolizas.classList.toggle("active", !isComparador);
+      for (const [key, [btn, page]] of Object.entries(pageTabs)) {
+        btn.classList.toggle("active", key === which);
+        page.style.display = key === which ? "block" : "none";
+      }
     }
 
     btnResolverPoliza.addEventListener("click", resolverPoliza);
@@ -743,7 +800,7 @@
     // comparacion) queda bloqueado hasta que se elige uno — antes tirar
     // "Ambiente invalido." recien al intentar usarlo era mas confuso que
     // simplemente no dejar tocarlo todavia.
-    const envGatedControls = [prFamily, prLimit, btnBuscarPolizas, polIdent, btnResolverPoliza, reportAEl, reportBEl, btnBuscar, cmpFamily, cmpScope, cmpPerProduct];
+    const envGatedControls = [prFamily, prLimit, btnBuscarPolizas, polIdent, btnResolverPoliza, reportAEl, reportBEl, btnBuscar, cmpFamily, cmpScope, cmpPerProduct, docIdent, btnDocResolver];
     function setEnvGatedEnabled(enabled) {
       envGatedControls.forEach(el => { el.disabled = !enabled; });
       ddProducto.setDisabled(!enabled);
@@ -1136,6 +1193,184 @@
       diffCell.innerHTML = pdfLinks(a.token, b.token) + ` · <button class="linklike">ver diff</button>`;
       const btn = diffCell.querySelector("button.linklike:last-child");
       btn.addEventListener("click", () => showPanel(tr, `<div class="difftable-wrap">${diff.html}</div>`));
+    }
+
+    // --- Pestaña "Descargar documentos" (misma logica que generar-imprimibles,
+    // ver documentos.py). docEnv fija el ambiente con el que se calculo la
+    // lista: las descargas usan ese, aunque despues se cambie el selector.
+    const DOC_GROUPS = ["Carátula", "Cotización", "Endosos", "Recibos", "Siniestros"];
+    let docEnv = null;
+    let docItems = [];
+
+    btnDocResolver.addEventListener("click", resolverDocumentos);
+    docIdent.addEventListener("keydown", (e) => { if (e.key === "Enter") resolverDocumentos(); });
+
+    async function resolverDocumentos() {
+      const value = docIdent.value.trim();
+      if (!value) { docHint.innerHTML = '<span class="error">Ingresá un identificador.</span>'; return; }
+      btnDocResolver.disabled = true;
+      docMatchesCard.style.display = "none";
+      docListCard.style.display = "none";
+      docHint.innerHTML = '<span class="spinner"></span> Cargando…';
+      docEnv = envEl.value;
+      try {
+        const res = await fetch("/doc_resolve", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ env: docEnv, policy: value }),
+        });
+        const data = await res.json();
+        if (!res.ok) { docHint.innerHTML = '<span class="error">' + escapeHtml(data.error || "Error") + '</span>'; return; }
+        const matches = data.matches || [];
+        const via = data.engagement_id ? `Engagement de autos multinciso ${data.engagement_id}.`
+          : data.quote_id ? `Resuelto por quote_id ${data.quote_id}.` : "";
+        if (data.documentos) {
+          docHint.textContent = via;
+          renderDocumentos(data.documentos);
+        } else if (!matches.length) {
+          docHint.innerHTML = '<span class="error">No se encontró ninguna póliza con ese identificador.</span>';
+        } else {
+          docHint.textContent = `${via} ${matches.length} pólizas: elegí de cuál ver los documentos.`.trim();
+          renderDocMatches(matches);
+        }
+      } catch (err) {
+        docHint.innerHTML = '<span class="error">Error de red: ' + escapeHtml(String(err)) + '</span>';
+      } finally {
+        btnDocResolver.disabled = false;
+      }
+    }
+
+    function renderDocMatches(matches) {
+      docMatchesBody.innerHTML = matches.map((p, i) => `
+        <tr>
+          <td>${p.policy_id}</td>
+          <td>${escapeHtml(p.policy_no || "—")}</td>
+          <td>${escapeHtml(p.policy_lot || "—")}</td>
+          <td>${p.insr_type ?? "—"}</td>
+          <td>${p.policy_state ?? "—"}</td>
+          <td><button class="secondary" data-idx="${i}">Ver documentos</button></td>
+        </tr>
+      `).join("");
+      docMatchesBody.querySelectorAll("button").forEach(b => {
+        b.addEventListener("click", () => cargarDocumentosDe(matches[+b.dataset.idx]));
+      });
+      docMatchesCard.style.display = "block";
+    }
+
+    async function cargarDocumentosDe(policy) {
+      docListCard.style.display = "block";
+      docMeta.innerHTML = "";
+      docGroups.innerHTML = '<span class="spinner"></span> Cargando…';
+      try {
+        const res = await fetch("/doc_for_policy", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ env: docEnv, policy }),
+        });
+        const data = await res.json();
+        if (!res.ok) { docGroups.innerHTML = '<span class="error">' + escapeHtml(data.error || "Error") + '</span>'; return; }
+        renderDocumentos(data);
+      } catch (err) {
+        docGroups.innerHTML = '<span class="error">Error de red: ' + escapeHtml(String(err)) + '</span>';
+      }
+    }
+
+    function renderDocumentos(d) {
+      docItems = d.items || [];
+      const estado = d.estado == null ? null
+        : `${d.estado}${d.emitida ? " (emitida)" : d.cotizacion ? " (cotización)" : ""}`;
+      const badges = [
+        ["Ambiente", docEnv],
+        ["Póliza", d.policy_id == null ? null : d.policy_no ? `${d.policy_no} (${d.policy_id})` : d.policy_id],
+        ["Producto", d.producto],
+        ["Estado", estado],
+        ["Engagement", d.engagement_id],
+        d.masters ? ["Maestras", d.masters] : ["Incisos", d.incisos],
+      ].filter(([, v]) => v != null && v !== "");
+      docMeta.innerHTML = badges.map(([k, v]) => `<span class="badge">${k}: <strong>${escapeHtml(String(v))}</strong></span>`).join("")
+        + `<span class="badge">${docItems.length} documento(s)</span>`;
+
+      if (!docItems.length) {
+        docGroups.innerHTML = '<span class="muted">Esta póliza no tiene documentos disponibles según las reglas.</span>';
+      } else {
+        let html = "";
+        for (const g of DOC_GROUPS) {
+          const inGroup = docItems.map((it, idx) => ({ it, idx })).filter(x => x.it.grupo === g);
+          if (!inGroup.length) continue;
+          html += `<div class="doc-group"><div class="doc-group-title">${g}</div>`;
+          // Filas consecutivas con el mismo label (p.ej. la carátula de la
+          // emisión + una por endoso) van bajo un encabezado comun.
+          const clusters = [];
+          for (const x of inGroup) {
+            const last = clusters[clusters.length - 1];
+            if (last && last.label === x.it.label) last.items.push(x);
+            else clusters.push({ label: x.it.label, items: [x] });
+          }
+          for (const cl of clusters) {
+            const nested = cl.items.every(x => x.it.subtitulo);
+            if (nested) html += `<div class="doc-label">${escapeHtml(cl.label)}</div>`;
+            html += cl.items.map(x => docRowHtml(x, nested)).join("");
+          }
+          html += "</div>";
+        }
+        docGroups.innerHTML = html;
+        docGroups.querySelectorAll(".doc-btn").forEach(b => {
+          b.addEventListener("click", () => descargarDocumento(b.closest(".doc-row")));
+        });
+      }
+      docListCard.style.display = "block";
+    }
+
+    function docRowHtml({ it, idx }, nested) {
+      const title = nested ? it.subtitulo : it.label;
+      const sub = nested ? "" : (it.subtitulo || "");
+      const params = `${it.report} · ${it.params.map(p => p ?? "—").join(", ")}`;
+      return `
+        <div class="doc-row${nested ? " sub" : ""}" data-idx="${idx}">
+          <div class="doc-info">
+            <div class="doc-t">${escapeHtml(String(title))}</div>
+            ${sub ? `<div class="doc-s">${escapeHtml(sub)}</div>` : ""}
+            <div class="doc-params">${escapeHtml(params)}</div>
+            ${it.nota ? `<div class="doc-note">${escapeHtml(it.nota)}</div>` : ""}
+            <div class="doc-result"></div>
+          </div>
+          ${it.downloadable
+            ? '<button class="secondary doc-btn">Descargar PDF</button>'
+            : '<button class="secondary" disabled>No disponible</button>'}
+        </div>`;
+    }
+
+    async function descargarDocumento(row) {
+      const it = docItems[+row.dataset.idx];
+      const btn = row.querySelector(".doc-btn"), out = row.querySelector(".doc-result");
+      btn.disabled = true; btn.textContent = "Generando…";
+      out.innerHTML = '<span class="spinner"></span> Generando…';
+      try {
+        const res = await fetch("/doc_download", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ env: docEnv, report: it.report, params: it.params }),
+        });
+        const d = await res.json();
+        const t = d.elapsed != null ? ` · ${d.elapsed.toFixed(1)} s` : "";
+        if (!res.ok) {
+          out.innerHTML = `<span class="pill pill-bad">✕ ${escapeHtml(d.error || "Error")}${t}</span>`
+            + (d.hint ? `<div class="doc-note">${escapeHtml(d.hint)}</div>` : "")
+            + (d.detail ? `<div class="doc-s">${escapeHtml(d.detail)}</div>` : "");
+          return;
+        }
+        const links = `<a class="doc-link" href="/pdf/${d.token}" target="_blank">Abrir</a> · `
+          + `<a class="doc-link" href="/pdf/${d.token}" download="${escapeAttr(d.filename)}">Descargar</a>`;
+        if (d.blank) {
+          // No se descarga solo: un PDF vacio casi nunca es lo que se buscaba.
+          out.innerHTML = `<span class="pill pill-warn">⚠ PDF en blanco${t}</span>${links}`
+            + `<div class="doc-note">${escapeHtml(d.hint)}</div>`;
+          return;
+        }
+        out.innerHTML = `<span class="pill pill-ok">✓ ${d.pages} pág.${t}</span>${links}`;
+        out.querySelector("a[download]").click();
+      } catch (err) {
+        out.innerHTML = `<span class="pill pill-bad">✕ Error de red</span><div class="doc-s">${escapeHtml(String(err))}</div>`;
+      } finally {
+        btn.disabled = false; btn.textContent = "Descargar PDF";
+      }
     }
 
     function pdfLinks(tokenA, tokenB) {

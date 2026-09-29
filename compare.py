@@ -26,6 +26,19 @@ def extract_lines(pdf_bytes: bytes) -> list[str]:
     return lines
 
 
+def pdf_stats(pdf_bytes: bytes) -> tuple[int, int]:
+    """(paginas, lineas con texto). 0 lineas = PDF en blanco: OIC responde 200
+    igual cuando la vista del reporte no devuelve filas."""
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        lines = sum(
+            1
+            for page in pdf.pages
+            for line in (page.extract_text() or "").split("\n")
+            if line.strip()
+        )
+        return len(pdf.pages), lines
+
+
 def _norm(line: str) -> str:
     return " ".join(line.split())
 

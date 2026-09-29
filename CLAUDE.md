@@ -13,10 +13,11 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
    se pensó explícitamente; `Car_Mul_V3` hoy solo está desplegado en
    SIT/PREPROD, ver "Limitaciones conocidas"), arriba
    de todo, porque lo usan tanto la búsqueda de insumos como la ejecución.
-   Debajo, la página se divide en dos pestañas: "Buscar pólizas" (Insumos,
-   Pólizas encontradas, Endosos) y "Comparador" (Configuración de la
-   comparación, Casos de prueba). Cambiar de pestaña solo oculta/muestra:
-   una comparación en curso sigue corriendo.
+   Debajo, la página se divide en tres pestañas: "Buscar pólizas" (Insumos,
+   Pólizas encontradas, Endosos), "Comparador" (Configuración de la
+   comparación, Casos de prueba) y "Descargar documentos" (ver más abajo).
+   Cambiar de pestaña solo oculta/muestra: una comparación o descarga en
+   curso sigue corriendo.
 2. Para conseguir casos de prueba (pólizas reales) hay dos caminos, según la
    familia de imprimible:
    - **"Buscar casos"** (pestaña "Comparador"): con Familia + Alcance
@@ -144,11 +145,58 @@ filtra por un candidato concreto, uno por uno, hasta juntar los casos
 pedidos (tope duro `_MAX_PROBES = 60` candidatos probados). Como cada golpe a
 la vista puede tardar varios segundos, el default de casos es chico (5).
 
+## Pestaña "Descargar documentos"
+
+Port de `generar-imprimibles` (`/resolve` + `compute_imprimibles` /
+`compute_for_engagement`, reglas en `generar-imprimibles/docs/imprimibles.md`)
+en `documentos.py`: se ingresa un identificador, se listan los imprimibles
+que corresponden a la póliza agrupados (Carátula, Cotización, Endosos,
+Recibos, Siniestros) y cada uno se descarga vía OIC. Rutas: `/doc_resolve`
+(resuelve y, si queda una sola póliza o es un engagement, calcula los
+documentos), `/doc_for_policy` (cuando hubo varias pólizas y se elige una) y
+`/doc_download` (llama a OIC, guarda el PDF en `_pdf_store` y devuelve token,
+páginas, tiempo y si vino en blanco). Las descargas usan el ambiente con el que
+se calculó la lista (`docEnv`), no el que tenga el selector después.
+
+Diferencias con generar-imprimibles, a partir de lo aprendido (skills
+`imprimibles-oic`/`sql-gds` y memorias):
+
+- **PDF en blanco:** si el PDF no tiene ninguna línea de texto
+  (`pdf_stats` en `compare.py`), se avisa con la causa probable
+  (`blank_hint`) y **no se descarga solo**. OIC responde 200 aunque la vista
+  no devuelva filas (parámetro que no existe en el ambiente, o lag de réplica
+  INSIS→RAWDB de ~3-10 s en pólizas recién emitidas).
+- **HTTP 500 sin cuerpo:** se explica que es reporte no desplegado en el
+  ambiente o `.jrxml` que explota con esos datos (OIC no da la traza).
+- **Recibos pagados:** `_receipts` agrega `todo_pagado` (todas las
+  transacciones del doc con `paid_status = 'Y'`) y el ítem lo avisa: la
+  versión neteada de `Rec_Pag` (`CALCULUS_V5_VIEW`) los devuelve en blanco.
+  Validado en STST con PREMIUM-214305 (póliza 100000181933): lista la nota
+  y el PDF sale en blanco.
+- **Recibos, versión:** `blc_transactions.annex` llega como texto (`"0"`),
+  así que se convierte a int antes de compararlo. En generar-imprimibles no
+  se convierte y por eso ahí los recibos nunca dicen "Emisión" ni el nombre
+  del endoso (bug latente allá, no corregido).
+- **Endosos:** salen de `list_annexes` (`annex_details_view`, con
+  tipificación), igual que la tarjeta "Endosos" de "Buscar pólizas"; se
+  descarta `annex_id = 0` para no duplicar la emisión.
+- **Siniestros:** se ofrece `SIN_04` descargable porque su `.jrxml` solo
+  pide `claim_id` (`string_param1`); el resto de los `SIN_0X` pide
+  `string_param2/3` sin mapear. generar-imprimibles los listaba todos como
+  "no disponible".
+- Cada ítem muestra el reporte y los parámetros OIC que va a mandar.
+
+No se agregaron `Car_Seg_Oblig`, `Car_RC_USA` ni `Car_Benef`: no hay una
+regla conocida de a qué pólizas corresponden.
+
 ## Archivos clave
 
 - `app.py` — rutas Flask: `/`, `/cases`, `/products`, `/policy_cases`,
   `/policy_cases_sample`, `/resolve_policy`, `/policy_annexes`,
-  `/report_families`, `/run_case`, `/pdf/<token>`.
+  `/report_families`, `/run_case`, `/doc_resolve`, `/doc_for_policy`,
+  `/doc_download`, `/pdf/<token>`.
+- `documentos.py` — qué documentos tiene una póliza y catálogo `REPORTS`
+  (label + grupo), ver "Pestaña Descargar documentos".
 - `cases.py` — descubrimiento de casos (`list_mul_cases`, `list_products`,
   `list_policy_cases`, `list_products_sample`), ver arriba.
 - `resolver.py` — buscador por identificador (`resolve`, con `lookup_policy`
