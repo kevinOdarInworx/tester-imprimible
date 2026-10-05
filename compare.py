@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import difflib
 import io
+import re
 
 import pdfplumber
 
@@ -26,15 +27,22 @@ def extract_lines(pdf_bytes: bytes) -> list[str]:
     return lines
 
 
+# Jasper imprime el numero de pagina en el pie aunque la vista no devuelva
+# filas: un PDF que solo dice "Pág. 1 de 1" sigue estando en blanco (visto en
+# PROD con Car_Ind de un endoso, funcionalidad que solo existe en STST).
+_PAGE_NUMBER = re.compile(r"(p[áa]g(ina)?\.?\s*)?\d+(\s*(de|/)\s*\d+)?", re.IGNORECASE)
+
+
 def pdf_stats(pdf_bytes: bytes) -> tuple[int, int]:
-    """(paginas, lineas con texto). 0 lineas = PDF en blanco: OIC responde 200
-    igual cuando la vista del reporte no devuelve filas."""
+    """(paginas, lineas con contenido, sin contar el numero de pagina). 0
+    lineas = PDF en blanco: OIC responde 200 igual cuando la vista del reporte
+    no devuelve filas."""
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         lines = sum(
             1
             for page in pdf.pages
             for line in (page.extract_text() or "").split("\n")
-            if line.strip()
+            if line.strip() and not _PAGE_NUMBER.fullmatch(_norm(line))
         )
         return len(pdf.pages), lines
 

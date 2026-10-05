@@ -196,6 +196,8 @@
     .doc-group-title + .doc-label { margin-top: 0; }
     .doc-row { display: flex; align-items: center; gap: 14px; padding: 11px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 8px; background: var(--surface-2); }
     .doc-row.sub { margin-left: 16px; }
+    .doc-row.placeholder { background: none; border-style: dashed; padding-top: 9px; padding-bottom: 9px; }
+    .doc-row.placeholder .doc-t { color: var(--text-muted); }
     .doc-info { flex: 1; min-width: 0; }
     .doc-t { font-size: 13.5px; font-weight: 600; }
     .doc-s { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
@@ -1286,7 +1288,7 @@
         d.masters ? ["Maestras", d.masters] : ["Incisos", d.incisos],
       ].filter(([, v]) => v != null && v !== "");
       docMeta.innerHTML = badges.map(([k, v]) => `<span class="badge">${k}: <strong>${escapeHtml(String(v))}</strong></span>`).join("")
-        + `<span class="badge">${docItems.length} documento(s)</span>`;
+        + `<span class="badge">${docItems.filter(it => !it.placeholder).length} documento(s)</span>`;
 
       if (!docItems.length) {
         docGroups.innerHTML = '<span class="muted">Esta póliza no tiene documentos disponibles según las reglas.</span>';
@@ -1320,6 +1322,17 @@
     }
 
     function docRowHtml({ it, idx }, nested) {
+      if (it.placeholder) {
+        // Version (emision/endoso) sin documento: se lista igual para que se
+        // vea a que endoso le falta, sin boton.
+        return `
+          <div class="doc-row${nested ? " sub" : ""} placeholder">
+            <div class="doc-info">
+              <div class="doc-t">${escapeHtml(String(it.subtitulo))}</div>
+              <div class="doc-s">Sin recibo</div>
+            </div>
+          </div>`;
+      }
       const title = nested ? it.subtitulo : it.label;
       const sub = nested ? "" : (it.subtitulo || "");
       const params = `${it.report} · ${it.params.map(p => p ?? "—").join(", ")}`;

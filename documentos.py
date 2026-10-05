@@ -174,8 +174,23 @@ def compute_documents(env_key: str, policy: dict) -> dict:
         for a in list_annexes(env_key, policy_id):
             if not a["annex_id"]:
                 continue  # annex 0 es la emision, ya va aparte
-            partes = [a["annex_no"] or f"annex_id {a['annex_id']}", a["tipo_endoso"], a["tipificacion"]]
-            endosos.append({"annex_id": a["annex_id"], "sub": " — ".join(p for p in partes if p)})
+            # annex_no = letra del endoso + "-" + numero (annex_details_view).
+            # Puede venir sin letra ("-104767") o sin numero ("C-": visto en
+            # PROD en cancelaciones por falta de pago, varias en la misma
+            # poliza) — sin numero se agrega el annex_id para distinguirlas.
+            letra, _, numero = (a["annex_no"] or "").partition("-")
+            if numero:
+                annex_no = a["annex_no"]
+            elif a["annex_no"]:
+                annex_no = f"{a['annex_no']} (annex_id {a['annex_id']})"
+            else:
+                annex_no = f"annex_id {a['annex_id']}"
+            partes = [annex_no, a["tipo_endoso"], a["tipificacion"]]
+            endosos.append({
+                "annex_id": a["annex_id"],
+                "sub": " — ".join(p for p in partes if p),
+                "version": f"{annex_no} · Endoso {letra}" if letra else annex_no,
+            })
 
     items = []
     masters = []
@@ -222,16 +237,34 @@ def compute_documents(env_key: str, policy: dict) -> dict:
             for e in endosos:
                 items.append(_item("End_Ind", [policy_id, e["annex_id"]], subtitulo=e["sub"]))
 
-            version_by_annex = {e["annex_id"]: e["sub"] for e in endosos}
+            # Recibos agrupados por version: emision y despues cada endoso, en
+            # ese orden. Una version sin recibo igual se lista (placeholder)
+            # para que se vea a que endoso le falta — p.ej. los endosos B no
+            # mueven prima y no generan recibo.
+            # blc_transactions.annex es texto ("0", "3000104377"): sin
+            # convertir, "0" no cuenta como emision y no matchea los annex_id
+            # (int) de los endosos. generar-imprimibles tiene el mismo bug.
+            recibos_por_annex: dict[int, list] = {}
             for r in _receipts(cur, policy_no):
-                # blc_transactions.annex es texto ("0", "3000104377"): sin
-                # convertir, "0" no cuenta como emision y no matchea los annex_id
-                # (int) de los endosos. generar-imprimibles tiene el mismo bug.
-                doc, annex = r["doc_number"], int(r["annex"] or 0)
-                version = "Emisión" if not annex else version_by_annex.get(annex, f"annex_id {annex}")
-                nota = ("Todas las cuotas pagadas: la versión neteada de Rec_Pag lo devuelve en blanco"
-                        if r["todo_pagado"] else None)
-                items.append(_item("Rec_Pag", [doc], subtitulo=f"{version} — {doc}", nota=nota))
+                recibos_por_annex.setdefault(int(r["annex"] or 0), []).append(r)
+            versiones = []
+            if emitida:
+                versiones = [(0, "Endoso 0 (Emisión)")] + [(e["annex_id"], e["version"]) for e in endosos]
+            conocidos = {annex for annex, _ in versiones}
+            # Recibos de un annex que no esta en la lista (p.ej. endoso
+            # cancelado, que annex_details_view excluye) van al final.
+            versiones += [(annex, "Endoso 0 (Emisión)" if not annex else f"annex_id {annex}")
+                          for annex in sorted(recibos_por_annex) if annex not in conocidos]
+            for annex, version in versiones:
+                recibos = recibos_por_annex.get(annex, [])
+                if not recibos:
+                    items.append({**_item("Rec_Pag", [], subtitulo=version, downloadable=False),
+                                  "placeholder": True})
+                for r in recibos:
+                    doc = r["doc_number"]
+                    nota = ("Todas las cuotas pagadas: la versión neteada de Rec_Pag lo devuelve en blanco"
+                            if r["todo_pagado"] else None)
+                    items.append(_item("Rec_Pag", [doc], subtitulo=f"{version} — {doc}", nota=nota))
 
             for c in _claims(cur, policy_id):
                 sub = f"{c['claim_regid'] or c['claim_id']} - {c['claim_type'] or ''}".strip(" -")
@@ -275,11 +308,14 @@ def resolve(env_key: str, raw: str) -> dict:
     return result
 
 
-def blank_hint(report: str) -> str:
+def blank_hint(report: str, params: list) -> str:
     """Por que un PDF puede venir en blanco (200 OK pero sin texto: la vista
     del reporte no devolvio filas)."""
     base = ("La vista no devolvió filas: el parámetro no existe en este ambiente, o la póliza "
             "es muy reciente y todavía no llegó a RAWDB (la réplica tarda ~3-10 s).")
     if report == "Rec_Pag":
         return base + " En recibos, también pasa si todas las cuotas están pagadas (versión neteada)."
+    if report in ("Car_Ind", "Car_Mul") and len(params) > 1 and str(params[1]) not in ("", "0"):
+        return ("La carátula de un endoso todavía está en desarrollo (solo en STST): en los demás "
+                "ambientes sale en blanco. " + base)
     return base

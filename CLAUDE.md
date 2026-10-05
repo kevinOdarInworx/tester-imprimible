@@ -161,8 +161,10 @@ se calculó la lista (`docEnv`), no el que tenga el selector después.
 Diferencias con generar-imprimibles, a partir de lo aprendido (skills
 `imprimibles-oic`/`sql-gds` y memorias):
 
-- **PDF en blanco:** si el PDF no tiene ninguna línea de texto
-  (`pdf_stats` en `compare.py`), se avisa con la causa probable
+- **PDF en blanco:** si el PDF no tiene ninguna línea de texto fuera del
+  número de página (`pdf_stats` en `compare.py`: Jasper imprime "Pág. 1 de 1"
+  en el pie aunque la vista no devuelva filas — así sale en PROD la carátula
+  `Car_Ind` de un endoso, que solo existe en STST), se avisa con la causa probable
   (`blank_hint`) y **no se descarga solo**. OIC responde 200 aunque la vista
   no devuelva filas (parámetro que no existe en el ambiente, o lag de réplica
   INSIS→RAWDB de ~3-10 s en pólizas recién emitidas).
@@ -177,6 +179,16 @@ Diferencias con generar-imprimibles, a partir de lo aprendido (skills
   así que se convierte a int antes de compararlo. En generar-imprimibles no
   se convierte y por eso ahí los recibos nunca dicen "Emisión" ni el nombre
   del endoso (bug latente allá, no corregido).
+- **Recibos por endoso:** se listan agrupados por versión: "Endoso 0
+  (Emisión)" y después cada endoso en orden (`B-105326 · Endoso B`). Una
+  versión sin recibo igual aparece, como fila punteada "Sin recibo" sin botón
+  (`placeholder: True`, no cuenta en "N documento(s)"): p.ej. los endosos B
+  no mueven prima y no generan recibo (01/951/144287 en PROD: un recibo de
+  emisión + dos filas vacías por sus dos endosos B). Recibos de un annex que
+  no está en `annex_details_view` (endoso excluido por `annex_state`) van al
+  final con su `annex_id`. Si el `annex_no` viene sin número (`C-`, visto en
+  PROD en varias cancelaciones por falta de pago de la misma póliza,
+  100000143673) se le agrega el `annex_id` para poder distinguirlas.
 - **Endosos:** salen de `list_annexes` (`annex_details_view`, con
   tipificación), igual que la tarjeta "Endosos" de "Buscar pólizas"; se
   descarta `annex_id = 0` para no duplicar la emisión.

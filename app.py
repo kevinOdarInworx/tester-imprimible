@@ -326,7 +326,7 @@ def doc_download_route():
         "size": len(resp.content),
         "pages": pages,
         "blank": blank,
-        "hint": blank_hint(report) if blank else None,
+        "hint": blank_hint(report, params) if blank else None,
         "elapsed": elapsed,
     })
 
