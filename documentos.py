@@ -110,13 +110,19 @@ def _receipts(cur, policy_id, policy_no):
     de endoso distinta de 11 (cambio de forma de pago). Un doc sin ninguna
     transaccion que entre sale en blanco. Antes se miraba solo paid_status =
     'Y' y una nota de credito pagada (PREMIUM-244217 en PROD, -116) se
-    avisaba en blanco aunque se genera bien."""
+    avisaba en blanco aunque se genera bien.
+
+    `reemplazo` = 1 si el endoso es de cambio de forma de pago o de agente
+    (ver _notas_de_reemplazo)."""
     if not policy_no:
         return []
     return _rows(
         cur,
-        "SELECT doc_number, annex, MIN(oculta) AS en_blanco FROM ("
-        "  SELECT blc_doc.doc_number, blc_tr.annex, "
+        "SELECT doc_number, annex, doc_id, amount, created_on, MIN(oculta) AS en_blanco, "
+        "  (SELECT MAX(1) FROM insis_gen_v10.gen_annex_reason ar "
+        "   WHERE ar.policy_id = :pid AND TO_CHAR(ar.annex_id) = annex "
+        "     AND ar.annex_reason IN ('11', 'CHNGAGENT')) AS reemplazo FROM ("
+        "  SELECT blc_doc.doc_number, blc_tr.annex, blc_doc.doc_id, blc_doc.amount, blc_doc.created_on, "
         "    CASE WHEN blc_tr.paid_status IN ('N', 'P') THEN 0 "
         "         WHEN blc_tr.open_balance = 0 AND blc_tr.amount < 0 AND EXISTS ("
         "           SELECT 1 FROM insis_gen_v10.gen_annex_reason ar "
@@ -129,10 +135,30 @@ def _receipts(cur, policy_id, policy_no):
         "  JOIN insis_gen_blc_v10.blc_installments blc_ins ON blc_ins.transaction_id = blc_tr.transaction_id "
         "  WHERE blc_it.agreement = :ag AND blc_it.item_type = 'POLICY' "
         "    AND blc_doc.doc_number IS NOT NULL"
-        ") GROUP BY doc_number, annex "
+        ") GROUP BY doc_number, annex, doc_id, amount, created_on "
         "ORDER BY doc_number",
         {"ag": policy_no, "pid": policy_id},
     )
+
+
+def _notas_de_reemplazo(recibos) -> dict:
+    """doc_number del recibo nuevo -> doc_number de la nota de credito que
+    INSIS genero justo antes, en el mismo endoso.
+
+    En un cambio de forma de pago (razon 11) o de agente (CHNGAGENT) INSIS
+    genera en el mismo segundo dos documentos: una nota de credito que anula
+    los recibos anteriores (p.ej. las 2 cuotas semestrales) y el recibo
+    nuevo (las 4 trimestrales). Solo corresponde el nuevo. En PROD (07/10):
+    1573 endosos 11 y 766 de agente; en otras razones casi no pasa. No se
+    toma "el doc_number mas alto" porque un endoso puede tener documentos
+    posteriores (dias despues) o revertirse (recibo y despues la nota)."""
+    orden = sorted(recibos, key=lambda r: (r["created_on"], r["doc_id"]))
+    pares = {}
+    for nota, nuevo in zip(orden, orden[1:]):
+        if (nota["reemplazo"] and (nota["amount"] or 0) < 0 < (nuevo["amount"] or 0)
+                and (nuevo["created_on"] - nota["created_on"]).total_seconds() <= 60):
+            pares[nuevo["doc_number"]] = nota["doc_number"]
+    return pares
 
 
 def _claims(cur, policy_id):
@@ -413,11 +439,20 @@ def compute_documents(env_key: str, policy: dict) -> dict:
                 if not recibos:
                     items.append({**_item("Rec_Pag", [], subtitulo=version, downloadable=False),
                                   "placeholder": True, "annex_id": annex})
+                reemplaza = _notas_de_reemplazo(recibos)
+                anuladas = set(reemplaza.values())
                 for r in recibos:
                     doc = r["doc_number"]
-                    nota = ("Todas sus cuotas están pagadas: la versión neteada de Rec_Pag lo devuelve en blanco"
-                            if r["en_blanco"] else None)
-                    items.append({**_item("Rec_Pag", [doc], subtitulo=f"{version} — {doc}", nota=nota),
+                    if doc in anuladas:
+                        continue
+                    notas = []
+                    if doc in reemplaza:
+                        notas.append(f"Reemplaza a {reemplaza[doc]}, la nota de crédito que anula "
+                                     "los recibos anteriores (no se muestra)")
+                    if r["en_blanco"]:
+                        notas.append("Todas sus cuotas están pagadas: la versión neteada de Rec_Pag lo devuelve en blanco")
+                    items.append({**_item("Rec_Pag", [doc], subtitulo=f"{version} — {doc}",
+                                          nota=" · ".join(notas) or None),
                                   "annex_id": annex})
 
             for c in _claims(cur, policy_id):

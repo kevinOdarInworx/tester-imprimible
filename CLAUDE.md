@@ -198,6 +198,17 @@ Diferencias con generar-imprimibles, a partir de lo aprendido (skills
   final con su `annex_id`. Si el `annex_no` viene sin número (`C-`, visto en
   PROD en varias cancelaciones por falta de pago de la misma póliza,
   100000143673) se le agrega el `annex_id` para poder distinguirlas.
+- **Cambio de forma de pago / de agente:** en un endoso con razón 11 o
+  `CHNGAGENT`, INSIS genera en el mismo segundo una nota de crédito que
+  anula los recibos anteriores y el recibo nuevo (0600201107/0135867/00 en
+  PROD: PREMIUM-257660 −564.88 anula las 2 cuotas semestrales y
+  PREMIUM-257661 trae las 4 trimestrales). `_notas_de_reemplazo` oculta esa
+  nota (negativa, seguida en ≤ 60 s por un recibo positivo del mismo annex)
+  y el recibo nuevo dice a cuál reemplaza. PROD 07/10: 1573 endosos 11 y 766
+  de agente con ese par; en otras razones casi no pasa (34 CANCLAPS, 8
+  más). No se usa "el doc_number más alto": falla si el endoso tiene
+  documentos posteriores (ajustes días después, ~40 casos) o se revirtió
+  (recibo y a los minutos la nota, ~25).
 - **Endosos:** salen de `list_annexes` (`annex_details_view`, con
   tipificación), igual que la tarjeta "Endosos" de "Buscar pólizas"; se
   descarta `annex_id = 0` para no duplicar la emisión.
