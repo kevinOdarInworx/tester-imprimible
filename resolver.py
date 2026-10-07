@@ -157,7 +157,7 @@ def list_engagement_policies(env_key: str, engagement_id) -> list[dict]:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT pep.policy_id, po.policy_no, po.policy_lot, po.insr_type, "
-                "  po.policy_state, pep.eng_pol_type "
+                "  po.policy_state, pep.eng_pol_type, pep.engagement_id "
                 "FROM insis_gen_v10.policy_eng_policies pep "
                 "JOIN insis_gen_v10.policy po ON po.policy_id = pep.policy_id "
                 "WHERE pep.engagement_id = :e "
@@ -169,6 +169,32 @@ def list_engagement_policies(env_key: str, engagement_id) -> list[dict]:
                 {col: _serialize(val) for col, val in zip(cols, record)}
                 for record in cur.fetchall()
             ]
+
+
+def engagement_of_policies(env_key: str, policy_ids) -> dict:
+    """policy_id -> {engagement_id, eng_pol_type} de las polizas que estan en
+    un engagement con alguna MASTER: una DEPENDENT buscada por su policy_no
+    tambien dice a que engagement pertenece. Pasarle solo polizas de autos."""
+    policy_ids = sorted({int(p) for p in policy_ids if p is not None})
+    if not policy_ids:
+        return {}
+    binds = {f"p{i}": p for i, p in enumerate(policy_ids)}
+    with get_connection(env_key) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT DISTINCT pep.policy_id, pep.engagement_id, pep.eng_pol_type "
+                "FROM insis_gen_v10.policy_eng_policies pep "
+                f"WHERE pep.policy_id IN ({', '.join(':' + k for k in binds)}) "
+                "  AND pep.eng_pol_type IN ('MASTER', 'DEPENDENT') "
+                "  AND EXISTS (SELECT 1 FROM insis_gen_v10.policy_eng_policies m "
+                "              WHERE m.engagement_id = pep.engagement_id AND m.eng_pol_type = 'MASTER') "
+                "ORDER BY pep.policy_id, pep.engagement_id",
+                binds,
+            )
+            return {
+                _serialize(pid): {"engagement_id": _serialize(eng), "eng_pol_type": tipo}
+                for pid, eng, tipo in cur.fetchall()
+            }
 
 
 def list_annexes(env_key: str, policy_id) -> list[dict]:
@@ -220,4 +246,14 @@ def resolve(env_key: str, raw: str) -> dict:
                 result["quote_id"] = raw
                 for pid in policy_ids:
                     matches.extend(lookup_policy(env_key, str(pid))["matches"])
+    # Por policy_no/policy_lot/quote_id no se sabe si es de un multinciso de
+    # autos: se busca su engagement (el path por engagement_id ya lo trae).
+    # Solo autos (insr_type 1xxx): en danios tambien hay filas MASTER en
+    # policy_eng_policies (0600201107/0135867/00 en PROD) y no aplica.
+    sin_engagement = [m for m in matches if not m.get("engagement_id")
+                      and str(m.get("insr_type") or "").startswith("1")]
+    if sin_engagement:
+        engs = engagement_of_policies(env_key, [m["policy_id"] for m in sin_engagement])
+        for m in sin_engagement:
+            m.update(engs.get(m["policy_id"], {}))
     return result

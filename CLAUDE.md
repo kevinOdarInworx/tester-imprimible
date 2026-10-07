@@ -64,6 +64,14 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
      un reporte puntual), con su `eng_pol_type` (`MASTER`/`DEPENDENT`,
      confirmado contra un engagement real en SIT).
 
+     Si se busca por `policy_no`/`policy_lot`/`policy_id`/`quote_id` una
+     póliza de autos (`insr_type` 1xxx), `engagement_of_policies` busca
+     igual su engagement (uno con alguna MASTER) y la tabla muestra
+     "Engagement ID" y el tipo como "Maestra"/"Dependiente" (p.ej. STST
+     23/701/138221 → dependiente de 880000000025032). En daños no se busca:
+     también tienen filas MASTER en `policy_eng_policies`
+     (0600201107/0135867/00 en PROD) y no son multinciso de autos.
+
      Después de resolver, el frontend encadena `/policy_annexes`
      (`list_annexes` en `resolver.py`) con los `policy_id` encontrados y
      muestra la tarjeta "Endosos" (annex_id, annex_no, tipo endoso,

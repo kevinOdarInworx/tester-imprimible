@@ -384,6 +384,7 @@
               <th data-sort="insr_type" data-type="num">INSR_TYPE</th>
               <th data-sort="policy_state" data-type="num">Policy State</th>
               <th data-sort="quote_id" data-type="num">Quote ID</th>
+              <th data-sort="engagement_id" data-type="num">Engagement ID</th>
               <th data-sort="eng_pol_type" data-type="str">Tipo (engagement)</th>
               <th data-sort="producto" data-type="str">Producto</th>
             </tr>
@@ -1108,6 +1109,8 @@
       });
     }
 
+    const ENG_POL_TYPE = { MASTER: "Maestra", DEPENDENT: "Dependiente" };
+
     function renderPolicyResults() {
       prResultsHead.querySelectorAll("th[data-sort]").forEach(th => {
         th.classList.toggle("sorted", th.dataset.sort === prSort.key);
@@ -1121,7 +1124,8 @@
           <td>${p.insr_type ?? "—"}</td>
           <td>${p.policy_state ?? "—"}</td>
           <td>${p.quote_id ?? "—"}</td>
-          <td>${p.eng_pol_type ?? "—"}</td>
+          <td>${p.engagement_id ?? "—"}</td>
+          <td>${ENG_POL_TYPE[p.eng_pol_type] ?? p.eng_pol_type ?? "—"}</td>
           <td>${p.producto ?? "—"}</td>
         </tr>
       `).join("");

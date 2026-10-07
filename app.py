@@ -173,8 +173,8 @@ def resolve_policy_route():
 
     # Mismo formato de caso que /policy_cases, para reusar tal cual la tabla
     # "Pólizas encontradas".
-    # eng_pol_type solo viene poblado cuando el match salio de resolver un
-    # engagement_id (ver list_engagement_policies en resolver.py).
+    # engagement_id/eng_pol_type solo vienen poblados para polizas de un
+    # multinciso de autos (ver engagement_of_policies en resolver.py).
     cases = [
         {
             "policy_id": m.get("policy_id"),
@@ -184,6 +184,7 @@ def resolve_policy_route():
             "policy_state": m.get("policy_state"),
             "quote_id": None,
             "eng_pol_type": m.get("eng_pol_type"),
+            "engagement_id": m.get("engagement_id"),
             "annex_id": 0,
             "no_poliza": m.get("policy_no"),
             "params": [m.get("policy_id"), 0],
