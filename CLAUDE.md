@@ -163,18 +163,27 @@ Diferencias con generar-imprimibles, a partir de lo aprendido (skills
 
 - **PDF en blanco:** si el PDF no tiene ninguna línea de texto fuera del
   número de página (`pdf_stats` en `compare.py`: Jasper imprime "Pág. 1 de 1"
-  en el pie aunque la vista no devuelva filas — así sale en PROD la carátula
-  `Car_Ind` de un endoso, que solo existe en STST), se avisa con la causa probable
+  en el pie aunque la vista no devuelva filas — así sale la carátula
+  `Car_Ind` de un endoso cuyo motivo no cubre `CAR_IND_DANIOS_VIEW`: desde el
+  despliegue del 06/10 en PROD solo arma filas de endoso para las razones
+  CHNGAGENT/8, 11, 62, 15, 34 y 2; con 55 aumento de suma asegurada o 38
+  endoso B libre sale en blanco), se avisa con la causa probable
   (`blank_hint`) y **no se descarga solo**. OIC responde 200 aunque la vista
   no devuelva filas (parámetro que no existe en el ambiente, o lag de réplica
   INSIS→RAWDB de ~3-10 s en pólizas recién emitidas).
 - **HTTP 500 sin cuerpo:** se explica que es reporte no desplegado en el
   ambiente o `.jrxml` que explota con esos datos (OIC no da la traza).
-- **Recibos pagados:** `_receipts` agrega `todo_pagado` (todas las
-  transacciones del doc con `paid_status = 'Y'`) y el ítem lo avisa: la
-  versión neteada de `Rec_Pag` (`CALCULUS_V5_VIEW`) los devuelve en blanco.
-  Validado en STST con PREMIUM-214305 (póliza 100000181933): lista la nota
-  y el PDF sale en blanco.
+- **Recibos pagados:** `_receipts` calcula `en_blanco` con el mismo filtro
+  que `CALCULUS_V5_VIEW` (versión neteada de `Rec_Pag`, en STST y PROD): una
+  transacción entra si no está pagada (`paid_status` N/P) **o** si es
+  negativa con saldo 0 y razón de endoso ≠ 11 (cambio de forma de pago). Si
+  ninguna entra, el ítem avisa que sale en blanco. Antes se miraba solo
+  `paid_status = 'Y'` y las notas de crédito pagadas (PREMIUM-244217 y
+  245004 en PROD, póliza 0000201107/0072610/00) se avisaban en blanco aunque
+  se generan bien. Validado generando los PDFs: 6/6 recibos de esa póliza en
+  PROD y PREMIUM-214305 en STST coinciden. En UAT PREMIUM-244183 (cargo
+  pagado) sale con datos aunque la regla dice en blanco: ahí el aviso puede
+  fallar (no investigado).
 - **Recibos, versión:** `blc_transactions.annex` llega como texto (`"0"`),
   así que se convierte a int antes de compararlo. En generar-imprimibles no
   se convierte y por eso ahí los recibos nunca dicen "Emisión" ni el nombre
@@ -201,12 +210,141 @@ Diferencias con generar-imprimibles, a partir de lo aprendido (skills
 No se agregaron `Car_Seg_Oblig`, `Car_RC_USA` ni `Car_Benef`: no hay una
 regla conocida de a qué pólizas corresponden.
 
+## Pestaña "Comparar vistas"
+
+Comparador de vistas extraído de `versiones-vistas-imprimibles` (pestaña
+"Comparar vistas"), como matriz vista × fuente. Nació como "Vistas del
+pase" (lista fija en `pase.py`); a pedido del usuario quedó **general** y el
+pase pasó a ser un release más de la pestaña "Releases".
+
+- **Qué vistas (`vSet`):** "Todas las vistas del repo" (default, ~80, tarda
+  ~10 s en cargar; arranca con el filtro "Solo las que difieren" marcado) o
+  las de un release (`/releases/<fecha>` → `vistas`), más las que se agregan
+  a mano (`vs.extra`, sobreviven al cambio de conjunto). Con "todas", la
+  columna "Releases" muestra en qué releases se tocó cada vista; con un
+  release, sus ítems (borde punteado = no figuraba en el correo).
+- **Filtros:** búsqueda por nombre y "Solo las que difieren" (`vEstadoFila`:
+  distinta si hay más de un md5 entre las fuentes marcadas o existe en unas
+  y no en otras; las fuentes con error no cuentan; la vista elegida en el
+  diff nunca se oculta).
+
+- **Fuentes:** el repo INSOR ("Repo") y los ambientes. Por defecto Repo,
+  UAT, STST y PROD; DEV y SIT están disponibles pero sin marcar (suelen
+  estar caídos). La selección se recuerda en `localStorage`. El frontend
+  pide cada fuente por separado y en paralelo (`/vistas/fuente`), así un
+  ambiente caído solo deja su columna en "Sin conexión" sin frenar al
+  resto; para eso `db.py` pasó a usar un candado por ambiente (antes uno
+  global retenía a todos durante el timeout de connect del caído).
+- **Agrupación:** en cada fila, la misma letra es el mismo `md5` de
+  `sqltext.comparable_md5` (sin comentarios, espacios ni líneas vacías),
+  igual que en `versiones-vistas-imprimibles`. La letra A es de la primera
+  columna que trae versión. Debajo va `LAST_DDL_TIME` del ambiente o la
+  fecha del último commit del archivo en el repo.
+- **"Estado":** compara PROD contra el repo, que es lo que se instala (a
+  pedido del usuario el 06/10: había pisado PROD con el repo y seguía
+  saliendo "Falta en PROD" porque se comparaba con STST). Si el repo no está
+  tildado o la vista no tiene archivo, compara contra STST. Muestra "Falta en
+  PROD" / "PROD igual al repo" (o "a STST") / "No existe en PROD"; y avisa
+  "STST distinto del repo" cuando no coinciden: o falta instalar el repo en
+  STST (p.ej. carind sin los candados de PROD), o STST tiene un cambio que no
+  se subió (p.ej. el arreglo de 325671/325715).
+- **Diff:** a pedido del usuario, el repo va siempre a la izquierda (A); a la
+  derecha, el primero de STST, PROD, UAT, SIT, DEV que tenga otra versión
+  (`vDefaultPair`). `/vistas/diff` usa `build_diff` copiado de
+  `versiones-vistas-imprimibles/views.py`: el diff **no muestra
+  comentarios**, así que para saber de qué ítem viene un cambio conviene
+  mirar el texto completo ("Copiar SQL"): p.ej. el arreglo de 325671/325715
+  en `CAR_IND_AUTOS_VIEW` de STST solo se identificó por sus comentarios
+  `-- WI 325671/325715`.
+- **Pisar con el repo (`instalar.py`, `/vistas/pisar`):** en el diff, un
+  botón por ambiente tildado que difiere del repo ("Pisar X", o "Crear en X"
+  si no existe; PROD en rojo). Abre una confirmación con lo que se instala
+  (archivo, commit), lo que se reemplaza y el CREATE que se ejecuta
+  (`/vistas/pisar_preview`). En PROD: alerta roja, aviso si STST no tiene
+  esa versión, y hay que escribir `PROD`; el servidor también lo exige. El
+  DDL es el CREATE que el .sql trae comentado, descomentado (también las
+  columnas comentadas si ocupa varias líneas), **sin FORCE** (si la query
+  falla, Oracle no la crea y la vista queda como estaba) + la primera query
+  del archivo. Antes de ejecutar, el servidor vuelve a leer el repo y el
+  ambiente y no pisa si el md5 no es el que vio el usuario (409). Si el
+  CREATE no dice esquema o el esquema no es el dueño actual, se niega.
+  Guarda la versión anterior con `DBMS_METADATA.GET_DDL` en
+  `backups/<AMBIENTE>/<VISTA>_<fecha>.sql` (CP1252) y cada intento en
+  `backups/instalaciones.jsonl` (`backups/` está en .gitignore). Se conecta
+  como DM_DBA, que tiene CREATE ANY VIEW en los ambientes. **Ojo al
+  probarlo:** `cursor.parse()` de un DDL lo ejecuta; para validar sin
+  instalar, parsear solo el SELECT.
+- **`LAST_DDL_TIME` no es la fecha del cambio:** se actualiza también cuando
+  la vista se recompila sola porque cambió algo de lo que depende. El
+  25/09 en STST se reemplazó `POLICY_DETAILS_VIEW` y ~25 vistas quedaron con
+  esa fecha (entre ellas `CAR_IND_AUTOS_VIEW`, cuyo contenido es del 23/09).
+- **Repo (`repo_views.py`):** lee la referencia `REPO_REF` (default
+  `origin/develop`) con `git ls-tree` + `git cat-file --batch`, **no el
+  working tree** (el clon suele tener cambios sin commitear o estar en otra
+  rama). Indexa `REPO_VIEW_DIRS` (`GDS/FASE 1` y `GDS/Complementarias`, donde
+  viven las `CALCULUS_V*_VIEW`); las subcarpetas `Deprecadas`, `Versiones en
+  prod` y `no estables` solo cuentan si no hay otro archivo. La referencia se
+  mueve con el botón "Refrescar" (`vRefrescar`: primero `git fetch origin`,
+  que no toca la rama local ni el working tree, y después vuelve a leer todas
+  las fuentes; si el fetch falla, igual compara con lo que hay). El par que el
+  usuario eligió en el diff (`vs.pair`) sobrevive al refresco. Los mensajes
+  de commit se decodifican UTF-8 con fallback a Windows-1252.
+  **Del archivo solo cuenta la primera sentencia** (`_first_statement`: hasta
+  el primer `;` o línea con solo `/`, fuera de literales y comentarios).
+  Varios .sql traen después queries de validación que nunca están en la
+  base (p.ej. `rec-pag_nota-cred-acumulativo.sql`); antes se comparaban y
+  marcaban "Repo distinto de STST" en falso. `versiones-vistas-imprimibles`
+  todavía compara el archivo entero (solo saca un `;` final).
+- **Base (`vistas.py`):** una sola consulta por ambiente con todas las vistas
+  (`DBA_VIEWS` + `DBA_OBJECTS`, fallback `ALL_*`). Si el nombre existe en más
+  de un esquema prefiere `INSOR_GDS` (en `versiones-vistas-imprimibles` gana
+  el primero alfabético, `INSOR_DM`).
+- No compara Jasper (`.jrxml`): solo vistas.
+
+## Pestaña "Releases"
+
+Registro de qué tocamos de nuestro lado (vistas de INSOR y reportes Jasper)
+en cada pase a PROD, pedido por el usuario para que quede guardado release
+por release. No consulta la base: lee `releases/AAAA-MM-DD.json`
+(`releases.py`), uno por pase, versionados con la app.
+
+- **Cómo se arma un release:** a mano o pidiéndoselo a Claude, a partir del
+  correo de VoBo del pase ("GDS - MX - VoBo liberación a Prod …"), del
+  contenido a liberar de cada ítem en Azure DevOps y de los commits del repo
+  INSOR que lo nombran (`git log --all --grep=<id>`). Cada ítem lleva `lado`:
+  `imprimibles` (con `vistas`, `jasper`, `commits`), `insis`, `no_aplica` o
+  `sin_registro` (p.ej. incidentes de L2 sin commits ni ítems en ADO). Los
+  ítems que van pero no figuraban en el correo llevan `en_correo: false` (y
+  `incluido_por` si son hijos de una historia que sí figura); los que no se
+  sabe si van, `confirmar: true`. Ojo: los commits que nombran una US pueden
+  incluir cosas que no van (237275 nombra RC USA y Vidauto, fuera de alcance)
+  y un arreglo puede no tener commit (325671/325715 se hicieron directo en
+  STST): por eso se cura a mano, no se genera solo.
+- **Foto:** `py -3.10 releases.py foto AAAA-MM-DD` guarda en el JSON, por cada
+  vista del release, el archivo y commit del repo y el md5 de UAT, STST y
+  PROD en ese momento: queda registrado qué versión iba en el pase. Tomarla
+  cuando el release está listo para salir (y repetirla si cambia el repo).
+- **Detalle en pantalla:** notas, "Lo que tocamos" (vistas como botones que
+  abren "Comparar vistas" con ese release y esa vista, Jasper, commits con
+  link a GitHub), la foto y "El resto del pase". "Comparar estas vistas
+  ahora" abre "Comparar vistas" con el conjunto del release (`vIrA`).
+- Primer release registrado: 2026-10-06 (17 ítems del correo + 9 que no
+  figuraban en él; 10 con cambios nuestros, 5 vistas).
+
 ## Archivos clave
 
 - `app.py` — rutas Flask: `/`, `/cases`, `/products`, `/policy_cases`,
   `/policy_cases_sample`, `/resolve_policy`, `/policy_annexes`,
   `/report_families`, `/run_case`, `/doc_resolve`, `/doc_for_policy`,
-  `/doc_download`, `/pdf/<token>`.
+  `/doc_download`, `/pdf/<token>`, `/vistas/repo_info`, `/vistas/repo_index`,
+  `/vistas/fuente`, `/vistas/diff`, `/vistas/repo_fetch`, `/releases`,
+  `/releases/<fecha>`.
+- `releases.py` + `releases/*.json` — registro de releases y foto de sus
+  vistas, ver "Pestaña Releases".
+- `vistas.py` / `repo_views.py` / `sqltext.py` — texto de las vistas en la
+  base y en el repo, normalización y diff (ver "Pestaña Comparar vistas").
+- `instalar.py` — pisar una vista de un ambiente con la versión del repo
+  (backup + log en `backups/`), ver "Pisar con el repo".
 - `documentos.py` — qué documentos tiene una póliza y catálogo `REPORTS`
   (label + grupo), ver "Pestaña Descargar documentos".
 - `cases.py` — descubrimiento de casos (`list_mul_cases`, `list_products`,

@@ -60,21 +60,23 @@ DB_CONNECT_TIMEOUT = 15
 _CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 
 _thick_initialized = False
+_thick_lock = threading.Lock()
 
 
 def _init_thick_mode() -> None:
     global _thick_initialized
-    if _thick_initialized:
-        return
-    if not os.path.isdir(ORACLE_CLIENT_LIB):
-        raise RuntimeError(
-            "Las bases GDS requieren modo thick (Native Network Encryption) y no se "
-            f"encontro el Oracle Instant Client en {ORACLE_CLIENT_LIB!r}. "
-            "Definí ORACLE_CLIENT_LIB en .env (por defecto apunta a "
-            "../generar-imprimibles/oracle/instantclient_19_13)."
-        )
-    oracledb.init_oracle_client(lib_dir=ORACLE_CLIENT_LIB)
-    _thick_initialized = True
+    with _thick_lock:  # varios ambientes pueden conectar a la vez en el primer pedido
+        if _thick_initialized:
+            return
+        if not os.path.isdir(ORACLE_CLIENT_LIB):
+            raise RuntimeError(
+                "Las bases GDS requieren modo thick (Native Network Encryption) y no se "
+                f"encontro el Oracle Instant Client en {ORACLE_CLIENT_LIB!r}. "
+                "Definí ORACLE_CLIENT_LIB en .env (por defecto apunta a "
+                "../generar-imprimibles/oracle/instantclient_19_13)."
+            )
+        oracledb.init_oracle_client(lib_dir=ORACLE_CLIENT_LIB)
+        _thick_initialized = True
 
 
 def _port_is_open(port: int, host: str = "127.0.0.1") -> bool:
@@ -149,11 +151,20 @@ class _Tunnel:
 
 
 _tunnels: dict[str, _Tunnel] = {}
-_lock = threading.Lock()
+# Un candado por ambiente (no uno global): la pestaña "Vistas del pase" pide
+# varios ambientes en paralelo, y con un candado unico un ambiente caido
+# (DEV/SIT suelen estarlo) retenia a los demas durante todo su timeout.
+_env_locks: dict[str, threading.Lock] = {}
+_env_locks_guard = threading.Lock()
+
+
+def _env_lock(key: str) -> threading.Lock:
+    with _env_locks_guard:
+        return _env_locks.setdefault(key, threading.Lock())
 
 
 def _get_tunnel(env: dict) -> _Tunnel:
-    with _lock:
+    with _env_lock("tunnel:" + env["key"]):
         tunnel = _tunnels.get(env["key"])
         if tunnel is None:
             tunnel = _Tunnel(env["local_port"], env["remote_ip"])
@@ -188,7 +199,6 @@ class _PooledConnection:
 
 
 _connections: dict[str, oracledb.Connection] = {}
-_conn_lock = threading.Lock()
 
 
 def get_connection(env_key: str) -> _PooledConnection:
@@ -204,7 +214,7 @@ def get_connection(env_key: str) -> _PooledConnection:
     _init_thick_mode()
     _get_tunnel(env)
 
-    with _conn_lock:
+    with _env_lock("conn:" + env["key"]):
         conn = _connections.get(env["key"])
         if conn is not None:
             try:

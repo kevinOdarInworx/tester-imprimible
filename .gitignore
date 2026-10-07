@@ -13,3 +13,6 @@ keys/
 
 # Oracle Instant Client (este proyecto no trae copia propia)
 oracle/
+
+# Copias de las vistas antes de pisarlas desde "Comparar vistas" (instalar.py)
+backups/

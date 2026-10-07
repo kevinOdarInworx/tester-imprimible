@@ -206,6 +206,76 @@
     .doc-result:not(:empty) { margin-top: 8px; font-size: 12.5px; }
     .doc-result .pill { margin-right: 8px; }
     a.doc-link { color: var(--primary); font-weight: 600; font-size: 12.5px; }
+
+    /* Pestañas "Comparar vistas" y "Releases": un color por version dentro de cada fila. */
+    :root {
+      --v0: #4f46e5; --v0-bg: #eef0ff; --v0-bd: #c7c9fb;
+      --v1: #b54708; --v1-bg: #fff7ed; --v1-bd: #fed7aa;
+      --v2: #0e7490; --v2-bg: #e6f6fa; --v2-bd: #a5dcea;
+      --v3: #be185d; --v3-bg: #fdf0f6; --v3-bd: #f5bcd6;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --v0: #a5a2fc; --v0-bg: #383a5c; --v0-bd: #5a5c94;
+        --v1: #f0b866; --v1-bg: #453620; --v1-bd: #6e5432;
+        --v2: #67d3ea; --v2-bg: #1f4049; --v2-bd: #2f6370;
+        --v3: #f49ac1; --v3-bg: #4a2a3a; --v3-bd: #74405a;
+      }
+    }
+    .vistas-toolbar { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: end; }
+    .src-checks { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 6px 0; }
+    .src-checks label { display: inline-flex; align-items: center; gap: 6px; margin: 0; text-transform: none; letter-spacing: 0; font-size: 13.5px; color: var(--text); font-weight: 600; cursor: pointer; }
+    .src-checks input { width: auto; }
+    .src-checks .muted { font-weight: 400; font-size: 12px; }
+    .matriz-wrap { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow-x: auto; }
+    table.matriz th, table.matriz td { text-align: center; }
+    table.matriz th.vname, table.matriz td.vname, table.matriz th.items, table.matriz td.items { text-align: left; }
+    table.matriz td.vname .mono { font-weight: 600; }
+    table.matriz tbody tr { cursor: pointer; }
+    table.matriz tbody tr.selected { background: var(--primary-soft); }
+    .ver { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 26px; padding: 0 8px; border-radius: 8px; font-weight: 700; font-size: 13px; border: 1px solid; }
+    .ver-0 { color: var(--v0); background: var(--v0-bg); border-color: var(--v0-bd); }
+    .ver-1 { color: var(--v1); background: var(--v1-bg); border-color: var(--v1-bd); }
+    .ver-2 { color: var(--v2); background: var(--v2-bg); border-color: var(--v2-bd); }
+    .ver-3 { color: var(--v3); background: var(--v3-bg); border-color: var(--v3-bd); }
+    .ver-sub { display: block; font-size: 11.5px; color: var(--text-muted); margin-top: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .chip-item { display: inline-block; font-family: ui-monospace, SFMono-Regular, Consolas, "Courier New", monospace; font-size: 11.5px; padding: 2px 7px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border); margin: 2px 4px 2px 0; }
+    .chip-item.fuera { border-style: dashed; color: var(--text-muted); }
+    .vistas-legend { display: grid; gap: 4px; font-size: 12.5px; color: var(--text-muted); margin-top: 12px; }
+    .vista-add { display: flex; gap: 10px; }
+    .diff-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+    .diff-side { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 12.5px; min-width: 0; overflow-wrap: anywhere; }
+    .diff-side .t { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+    .quick-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .pisar-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px 12px; border: 1px dashed var(--border); border-radius: var(--radius-sm); font-size: 13px; }
+    .pisar-bar .t { font-weight: 600; margin-right: 4px; }
+    .modal-bg { position: fixed; inset: 0; background: rgba(10, 12, 18, .55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); width: 100%; max-width: 620px; max-height: calc(100vh - 32px); overflow: auto; padding: 22px; }
+    .modal h2 { overflow-wrap: anywhere; }
+    .modal .banner { margin-bottom: 12px; }
+    .modal input { margin-top: 4px; }
+    .pisar-det { margin: 0 0 12px; padding-left: 18px; font-size: 13.5px; line-height: 1.55; overflow-wrap: anywhere; }
+    .pisar-det li + li { margin-top: 4px; }
+    pre.pisar-create { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 150px; overflow: auto; margin: 4px 0 12px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+    .banner.warn { background: var(--warn-bg); border: 1px solid var(--warn-bd); color: var(--warn); }
+    .banner.warn .banner-icon { background: var(--warn); }
+    @media (max-width: 760px) { .vistas-toolbar, .diff-sides { grid-template-columns: 1fr; } }
+    .vistas-ctrls { display: flex; gap: 14px 24px; flex-wrap: wrap; align-items: flex-end; }
+    .matriz-filtros { display: flex; gap: 12px 18px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+    .matriz-filtros #vBuscar { max-width: 320px; }
+    label.check-inline { display: inline-flex; align-items: center; gap: 6px; margin: 0; text-transform: none; letter-spacing: 0; font-size: 13.5px; color: var(--text); font-weight: 600; cursor: pointer; }
+    label.check-inline input { width: auto; }
+    table.cases tbody tr.sel { background: var(--primary-soft); }
+    button.chip-item { cursor: pointer; color: var(--primary); font-weight: 600; box-shadow: none; }
+    button.chip-item:hover:not(:disabled) { background: var(--primary-soft); }
+    a.commit { font-family: ui-monospace, SFMono-Regular, Consolas, "Courier New", monospace; font-size: 12px; color: var(--primary); margin-right: 6px; }
+    .rel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+    .rel-notes { display: grid; gap: 8px; margin-top: 14px; }
+    .rel-note { background: var(--warn-bg); border: 1px solid var(--warn-bd); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; }
+    .item-flags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+    .item-flags .pill { font-size: 11.5px; padding: 2px 9px; }
+    table.cases td.wrap { white-space: normal; min-width: 220px; }
   </style>
 </head>
 <body>
@@ -218,7 +288,7 @@
       </div>
     </header>
 
-    <div class="card">
+    <div class="card" id="envCard">
       <h2>Ambiente</h2>
       <div style="max-width:320px">
         <label for="env">Ambiente</label>
@@ -234,6 +304,8 @@
       <button class="tab-btn active" id="pageTabBtnPolizas" type="button">Buscar pólizas</button>
       <button class="tab-btn" id="pageTabBtnComparador" type="button">Comparador</button>
       <button class="tab-btn" id="pageTabBtnDocs" type="button">Descargar documentos</button>
+      <button class="tab-btn" id="pageTabBtnVistas" type="button">Comparar vistas</button>
+      <button class="tab-btn" id="pageTabBtnReleases" type="button">Releases</button>
     </div>
 
     <div id="pagePolizas">
@@ -449,6 +521,95 @@
       <div id="docGroups"></div>
     </div>
     </div>
+    <div id="pageVistas" style="display:none">
+    <div class="card">
+      <h2>Comparar vistas</h2>
+      <div class="vistas-toolbar">
+        <div class="vistas-ctrls">
+          <div style="min-width:240px">
+            <label for="vSet">Qué vistas</label>
+            <select id="vSet"><option value="todas">Todas las vistas del repo</option></select>
+          </div>
+          <div>
+            <label>Dónde mirar</label>
+            <div class="src-checks" id="srcChecks"></div>
+          </div>
+        </div>
+        <button id="btnVistasRefrescar" type="button" title="Trae lo último de GitHub y vuelve a leer las vistas en cada ambiente">Refrescar</button>
+      </div>
+      <div class="hint" id="repoInfo"></div>
+    </div>
+
+    <div class="card">
+      <h2>Versiones por ambiente <span class="muted" id="matrizResumen" style="font-weight:500"></span></h2>
+      <div class="matriz-filtros">
+        <input id="vBuscar" placeholder="Buscar vista…" autocomplete="off" />
+        <label class="check-inline"><input type="checkbox" id="vSoloDif" checked> Solo las que difieren</label>
+      </div>
+      <div class="matriz-wrap">
+        <table class="cases matriz">
+          <thead id="matrizHead"></thead>
+          <tbody id="matrizBody"><tr><td class="muted">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="vistas-legend">
+        <span>En cada fila, la misma letra es la misma versión de la vista, sin contar comentarios ni espacios. Del archivo del repo solo cuenta la primera query.</span>
+        <span>Debajo de cada letra: cuándo se modificó la vista en ese ambiente, o el último commit del archivo en el repo.</span>
+        <span>Con "Todas las vistas" se ven los releases en los que se tocó cada una; con un release, sus ítems (borde punteado: va en el release pero no figuraba en el correo).</span>
+      </div>
+      <div style="margin-top:18px; max-width:540px">
+        <label for="vistaExtra">Agregar otra vista</label>
+        <div class="vista-add">
+          <input id="vistaExtra" list="repoViewNames" placeholder="Ej: POLICY_DETAILS_VIEW" autocomplete="off" />
+          <datalist id="repoViewNames"></datalist>
+          <button class="secondary" id="btnVistaAgregar" type="button">Agregar</button>
+        </div>
+        <div class="hint" id="vistaExtraHint"></div>
+      </div>
+    </div>
+
+    <div class="card" id="vdiffCard" style="display:none">
+      <h2>Diferencias <span class="mono" id="vdiffName"></span></h2>
+      <div class="config-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 12px">
+        <div><label for="vdiffA">Versión A (izquierda)</label><select id="vdiffA"></select></div>
+        <div><label for="vdiffB">Versión B (derecha)</label><select id="vdiffB"></select></div>
+      </div>
+      <div class="quick-btns">
+        <button class="secondary" type="button" data-pair="REPO,STST">Repo contra STST</button>
+        <button class="secondary" type="button" data-pair="REPO,PROD">Repo contra PROD</button>
+        <button class="secondary" type="button" data-pair="PROD,STST">PROD contra STST</button>
+      </div>
+      <div class="pisar-bar" id="vPisar" style="display:none"></div>
+      <div class="diff-sides" id="vdiffSides"></div>
+      <div class="stats" id="vdiffStats"></div>
+      <div id="vdiffBody"></div>
+    </div>
+
+    <div class="modal-bg" id="pisarModal" style="display:none">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pisarTitulo">
+        <h2 id="pisarTitulo"></h2>
+        <div id="pisarBody"></div>
+        <div class="modal-actions">
+          <button class="secondary" id="pisarCancelar" type="button">Cancelar</button>
+          <button id="pisarOk" type="button">Pisar</button>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <div id="pageReleases" style="display:none">
+    <div class="card">
+      <h2>Releases</h2>
+      <p class="muted" style="margin:0 0 14px">Qué tocamos de nuestro lado (vistas de INSOR y reportes Jasper) en cada pase a PROD. Cada release queda guardado en <span class="mono">releases/AAAA-MM-DD.json</span> dentro de esta app.</p>
+      <div class="cases-wrap">
+        <table class="cases">
+          <thead><tr><th>Fecha</th><th>Release</th><th class="num">Ítems</th><th class="num">Con cambios nuestros</th><th>Vistas que tocamos</th></tr></thead>
+          <tbody id="relListBody"><tr><td colspan="5" class="muted">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="relDetail"></div>
+    </div>
   </div>
 
   <script>
@@ -621,6 +782,8 @@
       polizas: [$("pageTabBtnPolizas"), $("pagePolizas")],
       comparador: [$("pageTabBtnComparador"), $("pageComparador")],
       documentos: [$("pageTabBtnDocs"), $("pageDocs")],
+      vistas: [$("pageTabBtnVistas"), $("pageVistas")],
+      releases: [$("pageTabBtnReleases"), $("pageReleases")],
     };
     for (const [key, [btn]] of Object.entries(pageTabs)) btn.addEventListener("click", () => switchPageTab(key));
     function switchPageTab(which) {
@@ -628,6 +791,14 @@
         btn.classList.toggle("active", key === which);
         page.style.display = key === which ? "block" : "none";
       }
+      // "Comparar vistas" mira todos los ambientes a la vez y "Releases" no
+      // consulta la base: el selector de Ambiente no aplica en ninguna.
+      $("envCard").style.display = which === "vistas" || which === "releases" ? "none" : "block";
+      if (which === "vistas") {
+        if (!vs.loaded) vLoad();
+        else if (vs.pendingSet) vIrAPendiente();
+      }
+      if (which === "releases" && !rs.loaded) rLoad();
     }
 
     btnResolverPoliza.addEventListener("click", resolverPoliza);
@@ -1330,6 +1501,7 @@
             <div class="doc-info">
               <div class="doc-t">${escapeHtml(String(it.subtitulo))}</div>
               <div class="doc-s">Sin recibo</div>
+              ${it.annex_id != null ? `<div class="doc-params">annex_id ${it.annex_id}</div>` : ""}
             </div>
           </div>`;
       }
@@ -1342,6 +1514,7 @@
             <div class="doc-t">${escapeHtml(String(title))}</div>
             ${sub ? `<div class="doc-s">${escapeHtml(sub)}</div>` : ""}
             <div class="doc-params">${escapeHtml(params)}</div>
+            ${it.annex_id != null ? `<div class="doc-params">annex_id ${it.annex_id}</div>` : ""}
             ${it.nota ? `<div class="doc-note">${escapeHtml(it.nota)}</div>` : ""}
             <div class="doc-result"></div>
           </div>
@@ -1404,6 +1577,767 @@
       row.innerHTML = `<td colspan="11">${html}</td>`;
       tr.after(row);
     }
+    // ---------- Pestaña "Comparar vistas" ----------
+    // Compara el texto de las vistas entre el repo INSOR y los ambientes. El
+    // conjunto es "todas las vistas del repo" o las de un release (pestaña
+    // Releases), mas las que se agreguen a mano. Cada fuente se pide por
+    // separado y en paralelo: un ambiente caido (DEV/SIT suelen estarlo) solo
+    // deja su columna en error, sin frenar a las demas.
+    const V_SOURCES = ["REPO", ...{{ environments | map(attribute='key') | list | tojson }}];
+    const V_DEFAULT = ["REPO", "UAT", "STST", "PROD"];
+    const V_LABEL = { REPO: "Repo" };
+    // El repo va siempre a la izquierda (A); a la derecha, el primer ambiente
+    // de esta lista que tenga otra version (si todos son iguales, el primero).
+    const V_DIFF_RIGHT = ["STST", "PROD", "UAT", "SIT", "DEV"];
+    // data[fuente] = { pending, error, views: { NOMBRE: {...} } }. gen descarta
+    // respuestas de una comparacion anterior. pendingSet/pendingVista: a donde
+    // ir cuando se llega desde la pestaña Releases.
+    const vs = {
+      loaded: false, set: "todas", vistas: [], extra: [], data: {}, gen: 0,
+      selected: null, diffKey: null, pair: null, repo: null, repoIndexP: null,
+      relPorVista: {}, pendingSet: null, pendingVista: null,
+    };
+    const vLabel = (s) => V_LABEL[s] || s;
+
+    function vChecked() { return V_SOURCES.filter(s => $("vsrc_" + s)?.checked); }
+
+    function fmtFecha(s) {
+      if (!s) return "";
+      const [y, m, d] = s.slice(0, 10).split("-");
+      return `${d}/${m}/${y}`;
+    }
+
+    function vInitChecks() {
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem("vistasFuentes") || "null"); } catch (e) { saved = null; }
+      const on = Array.isArray(saved) ? saved : V_DEFAULT;
+      $("srcChecks").innerHTML = V_SOURCES.map(s =>
+        `<label><input type="checkbox" id="vsrc_${s}" ${on.includes(s) ? "checked" : ""}> ${vLabel(s)}` +
+        `${s === "DEV" || s === "SIT" ? ' <span class="muted">(suele estar caído)</span>' : ""}</label>`
+      ).join("");
+      for (const s of V_SOURCES) {
+        $("vsrc_" + s).addEventListener("change", () => {
+          try { localStorage.setItem("vistasFuentes", JSON.stringify(vChecked())); } catch (e) { /* sin storage */ }
+          if ($("vsrc_" + s).checked && !vs.data[s]) vFetch(s, vs.vistas.map(v => v.vista));
+          vRender();
+          if (vs.selected) vRenderDiffOptions();
+        });
+      }
+    }
+
+    async function vLoad() {
+      vs.loaded = true;
+      vInitChecks();
+      vLoadRepoInfo();
+      try {
+        const d = await (await fetch("/releases")).json();
+        vs.relPorVista = {};
+        for (const r of d.releases) for (const n of r.vistas) (vs.relPorVista[n] ||= []).push(r);
+        $("vSet").innerHTML = '<option value="todas">Todas las vistas del repo</option>' +
+          d.releases.map(r => `<option value="release:${r.fecha}">Release del ${fmtFecha(r.fecha)}</option>`).join("");
+      } catch (e) { /* sin releases: solo "todas" */ }
+      vIrAPendiente();
+    }
+
+    async function vLoadRepoInfo() {
+      try {
+        const d = await (await fetch("/vistas/repo_info")).json();
+        vs.repo = d.repo;
+        vRenderRepoInfo();
+      } catch (e) { /* la linea del repo es informativa */ }
+    }
+
+    // Nombres de todas las vistas del repo (cacheado; refrescar=true lo vuelve a pedir).
+    function vRepoIndex(refrescar) {
+      if (!vs.repoIndexP || refrescar) {
+        vs.repoIndexP = fetch("/vistas/repo_index").then(r => r.json()).then(d => {
+          if (d.error) throw new Error(d.error);
+          $("repoViewNames").innerHTML = d.views.map(n => `<option value="${escapeAttr(n)}">`).join("");
+          return d.views;
+        });
+        vs.repoIndexP.catch(() => { vs.repoIndexP = null; });
+      }
+      return vs.repoIndexP;
+    }
+
+    // Abre el conjunto (y la vista) pedidos desde Releases, o "todas" la primera vez.
+    async function vIrAPendiente() {
+      const set = vs.pendingSet || (vs.vistas.length ? vs.set : "todas");
+      const vista = vs.pendingVista;
+      vs.pendingSet = vs.pendingVista = null;
+      if (set !== vs.set || !vs.vistas.length) {
+        const r = await vLoadSet(set, false);
+        if (!r) return;
+      }
+      if (vista) vSelect(vista);
+    }
+
+    // Carga la lista de vistas del conjunto y dispara la comparacion. Devuelve
+    // { done } (la promesa de todas las fuentes) o null si fallo la lista.
+    // refrescar=true conserva la vista elegida y el par del diff.
+    async function vLoadSet(set, refrescar) {
+      vs.set = set;
+      $("vSet").value = set;
+      $("matrizBody").innerHTML = '<tr><td class="muted"><span class="spinner"></span> Cargando la lista de vistas…</td></tr>';
+      let vistas;
+      try {
+        if (set === "todas") {
+          vistas = (await vRepoIndex(refrescar)).map(n => ({ vista: n, items: [] }));
+        } else {
+          const r = await fetch("/releases/" + set.slice("release:".length));
+          const d = await r.json();
+          if (!r.ok || d.error) throw new Error(d.error || ("HTTP " + r.status));
+          vistas = d.vistas;
+        }
+      } catch (e) {
+        $("matrizBody").innerHTML = `<tr><td class="error">No se pudo cargar la lista de vistas: ${escapeHtml(e.message)}</td></tr>`;
+        return null;
+      }
+      for (const n of vs.extra) if (!vistas.some(v => v.vista === n)) vistas.push({ vista: n, items: [], manual: true });
+      vs.vistas = vistas;
+      if (!refrescar) {
+        $("vSoloDif").checked = set === "todas";
+        vs.selected = null;
+        vs.pair = null;
+        $("vdiffCard").style.display = "none";
+      }
+      return { done: vCompareAll() };
+    }
+
+    function vCompareAll() {
+      vs.gen++;
+      vs.data = {};
+      vs.diffKey = null;  // el diff abierto se recalcula cuando vuelvan los datos
+      const names = vs.vistas.map(v => v.vista);
+      const pending = vChecked().map(s => vFetch(s, names));
+      vRender();
+      return Promise.all(pending);
+    }
+
+    // "Refrescar": git fetch del repo y despues vuelve a leer todas las fuentes.
+    // Si el fetch falla (sin red, sin credenciales) igual compara con lo que hay.
+    async function vRefrescar() {
+      const btn = $("btnVistasRefrescar");
+      btn.disabled = true;
+      btn.textContent = "Refrescando…";
+      try {
+        const res = await fetch("/vistas/repo_fetch", { method: "POST" });
+        const d = await res.json();
+        if (!res.ok || d.error) throw new Error(d.error || ("HTTP " + res.status));
+        vs.repo = d.repo;
+        vRenderRepoInfo();
+      } catch (e) {
+        vRenderRepoInfo();
+        $("repoInfo").insertAdjacentHTML("beforeend", ` <span class="error">No se pudo traer de GitHub: ${escapeHtml(e.message)}</span>`);
+      }
+      try {
+        const r = await vLoadSet(vs.set, true);
+        if (r) await r.done;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Refrescar";
+      }
+    }
+
+    async function vFetch(src, names) {
+      const gen = vs.gen;
+      const entry = vs.data[src] || (vs.data[src] = { pending: 0, error: null, views: {} });
+      entry.pending++;
+      entry.error = null;
+      vRender();
+      try {
+        const res = await fetch("/vistas/fuente", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source: src, views: names }),
+        });
+        const d = await res.json();
+        if (!res.ok || d.error) throw new Error(d.error || ("HTTP " + res.status));
+        if (gen === vs.gen) Object.assign(entry.views, d.views);
+      } catch (e) {
+        if (gen === vs.gen) entry.error = e.message;
+      } finally {
+        entry.pending--;
+      }
+      if (gen !== vs.gen) return;
+      vRender();
+      if (vs.selected) vRenderDiffOptions();
+    }
+
+    // md5 -> numero de version, en el orden de las columnas (la primera
+    // fuente que trae una version le da la letra A).
+    function vGroups(name) {
+      const map = {};
+      let n = 0;
+      for (const s of vChecked()) {
+        const v = vs.data[s]?.views?.[name];
+        if (v && v.found && !(v.md5 in map)) map[v.md5] = n++;
+      }
+      return map;
+    }
+
+    // "igual" / "distinta" / "cargando" entre las fuentes marcadas. Las que
+    // dieron error (ambiente caido) no cuentan.
+    function vEstadoFila(name) {
+      const md5s = new Set();
+      let found = 0, notFound = 0;
+      for (const s of vChecked()) {
+        const d = vs.data[s];
+        const v = d?.views?.[name];
+        if (!v) {
+          if (d && d.pending > 0) return "cargando";
+          continue;
+        }
+        if (v.found) { md5s.add(v.md5); found++; } else notFound++;
+      }
+      return md5s.size > 1 || (found && notFound) ? "distinta" : "igual";
+    }
+
+    function vCell(src, name, groups) {
+      const d = vs.data[src];
+      const v = d?.views?.[name];
+      if (!v) {
+        if (d && d.pending > 0) return '<span class="spinner"></span>';
+        if (d && d.error) {
+          return `<span class="pill pill-bad" title="${escapeAttr(d.error)}">${src === "REPO" ? "Error" : "Sin conexión"}</span>`;
+        }
+        return '<span class="muted">—</span>';
+      }
+      if (!v.found) return '<span class="pill pill-miss">No existe</span>';
+      const idx = groups[v.md5];
+      const fecha = src === "REPO" ? fmtFecha(v.commit?.date) : fmtFecha(v.last_ddl_time);
+      const title = src === "REPO"
+        ? `${v.file}${v.commit ? ` · ${v.commit.hash} ${v.commit.subject}` : ""}`
+        : `${v.owner}.${name} · modificada ${v.last_ddl_time || "?"}`;
+      return `<span class="ver ver-${idx % 4}" title="${escapeAttr(title)}">${String.fromCharCode(65 + idx)}</span>` +
+             `<span class="ver-sub">${fecha}</span>`;
+    }
+
+    // Lectura para un pase: lo que se instala en PROD es el archivo del repo.
+    // Sin repo (destildado o la vista no tiene archivo) se compara contra STST.
+    function vEstado(name) {
+      const chk = vChecked();
+      const get = (s) => chk.includes(s) ? vs.data[s]?.views?.[name] : null;
+      const prod = get("PROD"), stst = get("STST"), repo = get("REPO");
+      const ref = repo?.found ? { v: repo, de: "al repo" } : stst?.found ? { v: stst, de: "a STST" } : null;
+      const out = [];
+      if (prod && ref) {
+        if (!prod.found) out.push('<span class="pill pill-bad">No existe en PROD</span>');
+        else if (prod.md5 === ref.v.md5) out.push(`<span class="pill pill-ok">PROD igual ${ref.de}</span>`);
+        else out.push(`<span class="pill pill-bad" title="PROD no coincide con la versión del ${ref.v === repo ? "repo" : "STST"}">Falta en PROD</span>`);
+      }
+      if (stst && repo && stst.found && repo.found && stst.md5 !== repo.md5) {
+        out.push('<span class="pill pill-warn" title="Falta instalar el repo en STST, o STST tiene un cambio que no se subió al repo">STST distinto del repo</span>');
+      }
+      return out.join(" ") || '<span class="muted">—</span>';
+    }
+
+    function vItemsCell(v) {
+      if (v.manual) return '<span class="muted">Agregada a mano</span>';
+      if (vs.set !== "todas") {
+        return v.items.map(i =>
+          `<span class="chip-item${i.en_correo === false ? " fuera" : ""}" title="${escapeAttr(`${i.tipo}: ${i.titulo}${i.en_correo === false ? " (no figuraba en el correo del pase)" : ""}`)}">${escapeHtml(String(i.id))}</span>`
+        ).join("") || '<span class="muted">—</span>';
+      }
+      const rels = vs.relPorVista[v.vista] || [];
+      return rels.map(r => `<span class="chip-item" title="${escapeAttr(r.nombre)}">${fmtFecha(r.fecha)}</span>`).join("")
+        || '<span class="muted">—</span>';
+    }
+
+    function vRender() {
+      const cols = vChecked();
+      const q = $("vBuscar").value.trim().toUpperCase();
+      const solo = $("vSoloDif").checked;
+      let distintas = 0, cargando = 0;
+      const filas = [];
+      for (const v of vs.vistas) {
+        const est = vEstadoFila(v.vista);
+        if (est === "distinta") distintas++;
+        if (est === "cargando") cargando++;
+        if (q && !v.vista.includes(q)) continue;
+        if (solo && est === "igual" && v.vista !== vs.selected) continue;
+        filas.push(v);
+      }
+      $("matrizResumen").textContent = vs.vistas.length
+        ? `· ${filas.length} de ${vs.vistas.length} vistas · ${distintas} con diferencias${cargando ? ` · ${cargando} cargando` : ""}`
+        : "";
+      $("matrizHead").innerHTML = `<tr><th class="vname">Vista</th><th class="items">${vs.set === "todas" ? "Releases" : "Ítems"}</th>` +
+        cols.map(s => `<th>${vLabel(s)}</th>`).join("") + `<th>Estado</th><th></th></tr>`;
+      if (!filas.length) {
+        const msg = !vs.vistas.length ? "No hay vistas en este conjunto."
+          : q ? "Ninguna vista coincide con la búsqueda."
+          : "Todas las vistas coinciden en las fuentes elegidas.";
+        $("matrizBody").innerHTML = `<tr><td colspan="${cols.length + 4}" class="muted">${msg}</td></tr>`;
+        return;
+      }
+      $("matrizBody").innerHTML = filas.map(v => {
+        const groups = vGroups(v.vista);
+        return `<tr data-vista="${escapeAttr(v.vista)}" class="${vs.selected === v.vista ? "selected" : ""}">` +
+          `<td class="vname"><span class="mono">${escapeHtml(v.vista)}</span></td>` +
+          `<td class="items">${vItemsCell(v)}</td>` +
+          cols.map(s => `<td>${vCell(s, v.vista, groups)}</td>`).join("") +
+          `<td>${vEstado(v.vista)}</td>` +
+          `<td><button class="linklike" type="button">Ver diferencias</button></td></tr>`;
+      }).join("");
+    }
+
+    function vRenderRepoInfo() {
+      const r = vs.repo;
+      if (!r) return;
+      if (r.error) {
+        $("repoInfo").innerHTML = `<span class="error">No se pudo leer el repo INSOR: ${escapeHtml(r.error)}</span>`;
+        return;
+      }
+      const m = r.last_fetch_age_min;
+      const age = m == null ? "nunca" : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} días`;
+      $("repoInfo").innerHTML =
+        `Repo: <span class="mono">${escapeHtml(r.ref)}</span>, último commit del ${fmtFecha(r.tip?.date)} ` +
+        `(${escapeHtml(r.tip?.subject || "")}). Traído de GitHub por última vez ${age}.`;
+    }
+
+    function vAgregar() {
+      const name = $("vistaExtra").value.trim().toUpperCase();
+      if (!name) return;
+      if (vs.vistas.some(v => v.vista === name)) {
+        $("vistaExtraHint").textContent = "Esa vista ya está en la tabla.";
+        return;
+      }
+      vs.extra.push(name);
+      vs.vistas.push({ vista: name, items: [], manual: true });
+      $("vistaExtra").value = "";
+      $("vistaExtraHint").textContent = "";
+      for (const s of vChecked()) vFetch(s, [name]);
+      vRender();
+    }
+
+    function vAvailable(name) { return vChecked().filter(s => vs.data[s]?.views?.[name]?.found); }
+
+    function vDefaultPair(name, avail) {
+      const md5 = (s) => vs.data[s].views[name].md5;
+      const left = avail.includes("REPO") ? "REPO" : avail[0];
+      const rights = V_DIFF_RIGHT.filter(s => avail.includes(s) && s !== left);
+      const right = rights.find(s => md5(s) !== md5(left)) || rights[0] || avail.find(s => s !== left) || left;
+      return [left, right];
+    }
+
+    function vSourceLabel(s, name) {
+      const v = vs.data[s]?.views?.[name];
+      if (!v) return vLabel(s);
+      return s === "REPO"
+        ? `Repo · ${fmtFecha(v.commit?.date)}`
+        : `${s} · modificada ${fmtFecha(v.last_ddl_time)}`;
+    }
+
+    function vSelect(name) {
+      vs.selected = name;
+      vs.diffKey = null;
+      vs.pair = null;  // otra vista: vuelve al par por defecto
+      $("vdiffCard").style.display = "block";
+      $("vdiffName").textContent = "· " + name;
+      vRender();
+      vRenderDiffOptions();
+      $("vdiffCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    // Se llama al elegir otra vista y cada vez que termina de cargar una fuente.
+    // Usa el par que eligio el usuario (vs.pair, sobrevive a "Refrescar") si
+    // ya estan cargadas sus dos versiones; si no, el par por defecto. Solo
+    // recalcula el diff si cambio el par o se invalido (vs.diffKey = null).
+    function vRenderDiffOptions() {
+      const name = vs.selected;
+      vRenderPisar();
+      const avail = vAvailable(name);
+      const opts = avail.map(s => `<option value="${s}">${escapeHtml(vSourceLabel(s, name))}</option>`).join("");
+      $("vdiffA").innerHTML = opts;
+      $("vdiffB").innerHTML = opts;
+      const [a, b] = vs.pair && avail.includes(vs.pair[0]) && avail.includes(vs.pair[1])
+        ? vs.pair : vDefaultPair(name, avail);
+      $("vdiffA").value = a || "";
+      $("vdiffB").value = b || "";
+      if (`${name}|${a}|${b}` !== vs.diffKey) vDiff();
+    }
+
+    function vElegirPar(a, b) {
+      vs.pair = [a, b];
+      $("vdiffA").value = a;
+      $("vdiffB").value = b;
+      vDiff();
+    }
+
+    function vSide(tag, s, v, name) {
+      const det = s === "REPO"
+        ? `${escapeHtml(v.file)}${v.commit ? `<br>Último commit ${escapeHtml(v.commit.hash)} del ${fmtFecha(v.commit.date)}: ${escapeHtml(v.commit.subject)}` : ""}`
+        : `${escapeHtml(v.owner)}.${escapeHtml(name)} · modificada ${escapeHtml(v.last_ddl_time || "?")}` +
+          `${v.status && v.status !== "VALID" ? ` · <span class="error">${escapeHtml(v.status)}</span>` : ""}` +
+          `${v.other_owners?.length ? `<br>También existe en ${escapeHtml(v.other_owners.join(", "))}` : ""}`;
+      return `<div class="diff-side"><div class="t">${tag} · ${vLabel(s)}</div><div class="muted">${det}</div>` +
+             `<button class="linklike" type="button" data-copy="${s}">Copiar SQL</button></div>`;
+    }
+
+    async function vDiff() {
+      const name = vs.selected, a = $("vdiffA").value, b = $("vdiffB").value;
+      const key = `${name}|${a}|${b}`;
+      vs.diffKey = key;
+      const va = vs.data[a]?.views?.[name], vb = vs.data[b]?.views?.[name];
+      $("vdiffStats").innerHTML = "";
+      if (!va || !vb) {
+        vs.diffKey = null;  // reintenta cuando termine de cargar la fuente que falta
+        const cargando = vChecked().some(s => vs.data[s]?.pending > 0);
+        $("vdiffSides").innerHTML = "";
+        $("vdiffBody").innerHTML = cargando
+          ? '<span class="spinner"></span> <span class="muted">Cargando versiones…</span>'
+          : '<div class="muted">Hacen falta dos versiones cargadas de esta vista para comparar.</div>';
+        return;
+      }
+      $("vdiffSides").innerHTML = vSide("A", a, va, name) + vSide("B", b, vb, name);
+      if (a === b) {
+        $("vdiffBody").innerHTML = '<div class="muted">Elegí dos fuentes distintas.</div>';
+        return;
+      }
+      $("vdiffBody").innerHTML = '<span class="spinner"></span> <span class="muted">Comparando…</span>';
+      try {
+        const res = await fetch("/vistas/diff", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sql_a: va.sql, sql_b: vb.sql, label_a: vSourceLabel(a, name), label_b: vSourceLabel(b, name) }),
+        });
+        const d = await res.json();
+        if (key !== vs.diffKey) return;  // cambio la seleccion mientras comparaba
+        const st = d.stats;
+        $("vdiffStats").innerHTML =
+          `<span class="badge">Parecido <strong>${st.similarity}%</strong></span>` +
+          `<span class="badge">Líneas en A <strong>${st.lines_a}</strong></span>` +
+          `<span class="badge">Líneas en B <strong>${st.lines_b}</strong></span>`;
+        $("vdiffBody").innerHTML = st.identical
+          ? '<div class="banner ok"><span class="banner-icon">✓</span>Son la misma versión, sin contar comentarios ni espacios.</div>'
+          : `<div class="difftable-wrap">${d.html}</div>`;
+      } catch (e) {
+        if (key === vs.diffKey) $("vdiffBody").innerHTML = `<span class="error">${escapeHtml(e.message)}</span>`;
+      }
+    }
+
+    // "Pisar": instala en un ambiente la version del repo (instalar.py). El
+    // servidor vuelve a leer el repo y el ambiente y no pisa si cambiaron
+    // desde lo que se ve aca (por eso viajan los md5).
+    const ps = { env: null, name: null, md5Repo: null, md5Env: null, preview: null, previewError: null, running: false };
+
+    function vRenderPisar() {
+      const name = vs.selected, bar = $("vPisar");
+      const repo = vs.data.REPO?.views?.[name];
+      const envs = vChecked().filter(s => s !== "REPO");
+      if (!repo?.found || !envs.length) { bar.style.display = "none"; return; }
+      bar.style.display = "flex";
+      bar.innerHTML = '<span class="t">Pisar con la versión del repo:</span>' + envs.map(s => {
+        const d = vs.data[s], v = d?.views?.[name];
+        if (!v) {
+          const why = d?.pending ? "Cargando…" : d?.error ? "Sin conexión" : "Sin datos";
+          return `<button class="secondary" type="button" disabled title="${why}">${s}</button>`;
+        }
+        if (v.found && v.md5 === repo.md5) {
+          return `<button class="secondary" type="button" disabled title="Ya tiene la versión del repo">${s} ✓</button>`;
+        }
+        return `<button class="${s === "PROD" ? "danger" : "secondary"}" type="button" data-pisar="${s}">${v.found ? "Pisar" : "Crear en"} ${s}</button>`;
+      }).join("");
+    }
+
+    async function vAbrirPisar(env) {
+      const name = vs.selected;
+      const repo = vs.data.REPO?.views?.[name], v = vs.data[env]?.views?.[name];
+      if (!repo?.found || !v) return;
+      Object.assign(ps, { env, name, md5Repo: repo.md5, md5Env: v.found ? v.md5 : null, preview: null, previewError: null, running: false });
+      $("pisarTitulo").textContent = `${v.found ? "Pisar" : "Crear"} ${name} en ${env}`;
+      $("pisarOk").textContent = `${v.found ? "Pisar" : "Crear en"} ${env}`;
+      $("pisarOk").className = env === "PROD" ? "danger" : "";
+      $("pisarOk").style.display = "";
+      $("pisarCancelar").textContent = "Cancelar";
+      $("pisarCancelar").disabled = false;
+      $("pisarModal").style.display = "flex";
+      vRenderPisarBody();
+      try {
+        const r = await fetch("/vistas/pisar_preview?view=" + encodeURIComponent(name));
+        const d = await r.json();
+        if (!r.ok || d.error) throw new Error(d.error || ("HTTP " + r.status));
+        if (d.md5 !== ps.md5Repo) throw new Error("El repo cambió desde que lo miraste. Refrescá y revisá el diff de nuevo.");
+        if (ps.name === name && ps.env === env) ps.preview = d;
+      } catch (e) {
+        if (ps.name === name && ps.env === env) ps.previewError = e.message;
+      }
+      if (ps.name === name && ps.env === env) vRenderPisarBody();
+    }
+
+    function vRenderPisarBody() {
+      const { env, name } = ps;
+      const repo = vs.data.REPO.views[name], v = vs.data[env].views[name];
+      const stst = vChecked().includes("STST") ? vs.data.STST?.views?.[name] : null;
+      const groups = vGroups(name);
+      const letra = (x) => String.fromCharCode(65 + (groups[x.md5] ?? 0));
+      const out = [];
+      if (env === "PROD") {
+        out.push('<div class="banner bad"><span class="banner-icon">!</span>Estás por modificar PROD: cambia la vista que usan los imprimibles en producción.</div>');
+        if (!stst) out.push('<div class="banner warn"><span class="banner-icon">!</span>STST no está cargada: no se ve si esta versión está probada ahí.</div>');
+        else if (!stst.found || stst.md5 !== repo.md5) out.push('<div class="banner warn"><span class="banner-icon">!</span>STST tiene otra versión: esta no está probada en STST.</div>');
+      }
+      const carpetaVieja = repo.file.split("/").slice(0, -1).find(p => ["deprecadas", "versiones en prod", "no estables"].includes(p.toLowerCase()));
+      if (carpetaVieja) {
+        out.push(`<div class="banner warn"><span class="banner-icon">!</span>El archivo del repo está en la carpeta "${escapeHtml(carpetaVieja)}": no es una versión principal.</div>`);
+      }
+      const det = [
+        `Se instala la versión ${letra(repo)}, la del repo: <span class="mono">${escapeHtml(repo.file)}</span>` +
+          (repo.commit ? `, último commit ${escapeHtml(repo.commit.hash)} del ${fmtFecha(repo.commit.date)} (${escapeHtml(repo.commit.subject)})` : "") + ".",
+        v.found
+          ? `Reemplaza la versión ${letra(v)} de ${env}, modificada el ${fmtFecha(v.last_ddl_time)}. Antes se guarda una copia en <span class="mono">backups/${env}/</span>.`
+          : `La vista no existe en ${env}: se crea.`,
+        "Si la query tiene un error, Oracle no la crea y la vista queda como está.",
+      ];
+      out.push(`<ul class="pisar-det">${det.map(x => `<li>${x}</li>`).join("")}</ul>`);
+      if (ps.previewError) {
+        out.push(`<div class="error">${escapeHtml(ps.previewError)}</div>`);
+      } else if (!ps.preview) {
+        out.push('<span class="spinner"></span> <span class="muted">Preparando el CREATE…</span>');
+      } else {
+        out.push(`<label>Se ejecuta</label><pre class="pisar-create mono">${escapeHtml(ps.preview.header)}\n` +
+                 `<span class="muted">-- seguido de la primera query del archivo (${repo.line_count} líneas)</span></pre>`);
+        if (env === "PROD") out.push('<label for="pisarConfirma">Escribí PROD para confirmar</label><input id="pisarConfirma" autocomplete="off" spellcheck="false" />');
+      }
+      $("pisarBody").innerHTML = out.join("");
+      $("pisarConfirma")?.addEventListener("input", vPisarHabilitar);
+      $("pisarConfirma")?.addEventListener("keydown", (e) => { if (e.key === "Enter") vPisar(); });
+      vPisarHabilitar();
+      (env === "PROD" ? $("pisarConfirma") : $("pisarOk"))?.focus();
+    }
+
+    function vPisarHabilitar() {
+      $("pisarOk").disabled = ps.running || !ps.preview ||
+        (ps.env === "PROD" && ($("pisarConfirma")?.value.trim() || "") !== "PROD");
+    }
+
+    async function vPisar() {
+      if (!ps.env || $("pisarModal").style.display === "none") return;
+      vPisarHabilitar();
+      if ($("pisarOk").disabled || $("pisarOk").style.display === "none") return;
+      const { env, name } = ps;
+      ps.running = true;
+      $("pisarOk").disabled = true;
+      $("pisarOk").textContent = env === "PROD" ? "Pisando PROD…" : "Pisando…";
+      $("pisarCancelar").disabled = true;
+      let html;
+      try {
+        const res = await fetch("/vistas/pisar", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ env, view: name, md5_repo: ps.md5Repo, md5_env: ps.md5Env, confirmacion: $("pisarConfirma")?.value || "" }),
+        });
+        const d = await res.json();
+        if (!res.ok || d.error) throw new Error(d.error || ("HTTP " + res.status));
+        const bien = d.status === "VALID" && d.igual_al_repo;
+        html = bien
+          ? `<div class="banner ok"><span class="banner-icon">✓</span>Listo: ${escapeHtml(name)} en ${env} ${d.creada ? "se creó" : "quedó"} igual al repo.</div>`
+          : `<div class="banner bad"><span class="banner-icon">!</span>Se ejecutó, pero en ${env} quedó ${escapeHtml(d.status || "?")}${d.igual_al_repo ? "" : " y distinta del repo"}.</div>` +
+            (d.errores?.length ? `<pre class="pisar-create mono">${escapeHtml(d.errores.join("\n"))}</pre>` : "");
+        if (d.backup) html += `<div class="muted">Copia de la versión anterior: <span class="mono">${escapeHtml(d.backup)}</span></div>`;
+      } catch (e) {
+        html = `<div class="banner bad"><span class="banner-icon">!</span>No se pisó.</div><div class="error">${escapeHtml(e.message)}</div>`;
+      }
+      ps.running = false;
+      $("pisarBody").innerHTML = html;
+      $("pisarOk").style.display = "none";
+      $("pisarCancelar").textContent = "Cerrar";
+      $("pisarCancelar").disabled = false;
+      $("pisarCancelar").focus();
+      vs.diffKey = null;  // el diff se recalcula con lo que quedo en el ambiente
+      vFetch(env, [name]);
+    }
+
+    function vCerrarPisar() {
+      if (ps.running) return;
+      $("pisarModal").style.display = "none";
+      ps.env = ps.name = null;
+    }
+
+    // Desde Releases: abre Comparar vistas con ese conjunto (y esa vista).
+    function vIrA(set, vista) {
+      vs.pendingSet = set;
+      vs.pendingVista = vista || null;
+      switchPageTab("vistas");
+    }
+
+    $("btnVistasRefrescar").addEventListener("click", vRefrescar);
+    $("vSet").addEventListener("change", () => vLoadSet($("vSet").value, false));
+    $("vBuscar").addEventListener("input", vRender);
+    $("vSoloDif").addEventListener("change", vRender);
+    $("btnVistaAgregar").addEventListener("click", vAgregar);
+    $("vistaExtra").addEventListener("keydown", (e) => { if (e.key === "Enter") vAgregar(); });
+    $("matrizBody").addEventListener("click", (e) => {
+      const tr = e.target.closest("tr[data-vista]");
+      if (tr) vSelect(tr.dataset.vista);
+    });
+    $("vPisar").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-pisar]");
+      if (b) vAbrirPisar(b.dataset.pisar);
+    });
+    $("pisarOk").addEventListener("click", vPisar);
+    $("pisarCancelar").addEventListener("click", vCerrarPisar);
+    $("pisarModal").addEventListener("click", (e) => { if (e.target === $("pisarModal")) vCerrarPisar(); });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && $("pisarModal").style.display !== "none") vCerrarPisar();
+    });
+    const vElegirDesdeSelects = () => vElegirPar($("vdiffA").value, $("vdiffB").value);
+    $("vdiffA").addEventListener("change", vElegirDesdeSelects);
+    $("vdiffB").addEventListener("change", vElegirDesdeSelects);
+    document.querySelectorAll("#vdiffCard [data-pair]").forEach(btn => btn.addEventListener("click", () => {
+      const [a, b] = btn.dataset.pair.split(",");
+      const avail = vAvailable(vs.selected);
+      const falta = [a, b].filter(s => !avail.includes(s));
+      if (falta.length) {
+        $("vdiffBody").innerHTML = `<div class="muted">No hay versión cargada en ${falta.map(vLabel).join(" ni en ")}.</div>`;
+        return;
+      }
+      vElegirPar(a, b);
+    }));
+    $("vdiffSides").addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-copy]");
+      if (!btn) return;
+      const sql = vs.data[btn.dataset.copy]?.views?.[vs.selected]?.sql || "";
+      try {
+        await navigator.clipboard.writeText(sql);
+        btn.textContent = "Copiado";
+      } catch (err) {
+        btn.textContent = "No se pudo copiar";
+      }
+      setTimeout(() => { btn.textContent = "Copiar SQL"; }, 1600);
+    });
+
+    // ---------- Pestaña "Releases" ----------
+    // Registro de que tocamos de nuestro lado en cada pase a PROD (releases/*.json).
+    const rs = { loaded: false, releases: [], fecha: null };
+    const R_LADOS = {
+      insis: ["Arreglo en INSIS", "pill-warn"],
+      no_aplica: ["No toca imprimibles", "pill-miss"],
+      sin_registro: ["Sin registro", "pill-miss"],
+    };
+    const R_GITHUB_COMMIT = "https://github.com/Inworx/INSOR/commit/";
+
+    async function rLoad() {
+      rs.loaded = true;
+      try {
+        rs.releases = (await (await fetch("/releases")).json()).releases;
+      } catch (e) {
+        $("relListBody").innerHTML = `<tr><td colspan="5" class="error">No se pudieron leer los releases: ${escapeHtml(e.message)}</td></tr>`;
+        return;
+      }
+      rRenderList();
+      if (rs.releases.length) rOpen(rs.releases[0].fecha);
+      else $("relListBody").innerHTML = '<tr><td colspan="5" class="muted">Todavía no hay releases registrados.</td></tr>';
+    }
+
+    function rRenderList() {
+      $("relListBody").innerHTML = rs.releases.map(r =>
+        `<tr data-fecha="${r.fecha}" class="${r.fecha === rs.fecha ? "sel" : ""}" style="cursor:pointer">` +
+        `<td class="mono">${fmtFecha(r.fecha)}</td><td>${escapeHtml(r.nombre)}</td>` +
+        `<td class="num">${r.items}</td><td class="num">${r.imprimibles}</td>` +
+        `<td>${r.vistas.map(n => `<span class="chip-item">${escapeHtml(n)}</span>`).join("") || '<span class="muted">—</span>'}</td></tr>`
+      ).join("");
+    }
+
+    async function rOpen(fecha) {
+      rs.fecha = fecha;
+      rRenderList();
+      $("relDetail").innerHTML = '<div class="card"><span class="spinner"></span> <span class="muted">Cargando…</span></div>';
+      try {
+        const r = await fetch("/releases/" + fecha);
+        const d = await r.json();
+        if (!r.ok || d.error) throw new Error(d.error || ("HTTP " + r.status));
+        if (rs.fecha === fecha) rRenderDetail(d);
+      } catch (e) {
+        $("relDetail").innerHTML = `<div class="card error">${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    function rFlags(i) {
+      const f = [];
+      if (i.en_correo === false) f.push(`<span class="pill pill-miss">No figuraba en el correo${i.incluido_por ? ` · va con ${escapeHtml(i.incluido_por)}` : ""}</span>`);
+      if (i.confirmar) f.push('<span class="pill pill-warn">Confirmar si va</span>');
+      return f.length ? `<div class="item-flags">${f.join("")}</div>` : "";
+    }
+
+    function rItemCell(i) {
+      return `<span class="mono" style="font-weight:600">${escapeHtml(String(i.id))}</span>` +
+             `<div class="muted" style="font-size:12px">${escapeHtml(i.tipo || "")}${i.track ? " · " + escapeHtml(i.track) : ""}</div>`;
+    }
+
+    function rRenderDetail(rel) {
+      const items = rel.items || [];
+      const nuestros = items.filter(i => i.lado === "imprimibles");
+      const resto = ["insis", "no_aplica", "sin_registro"].flatMap(l => items.filter(i => i.lado === l));
+      const cuenta = (l) => items.filter(i => i.lado === l).length;
+      const set = "release:" + rel.fecha;
+
+      const head = `<div class="card">
+        <div class="rel-head">
+          <div><h2 style="margin-bottom:4px">${escapeHtml(rel.nombre)}</h2>
+            <div class="muted">${fmtFecha(rel.fecha)} · ${escapeHtml(rel.fuente || "")}</div></div>
+          <button type="button" data-ir-release="${set}">Comparar estas vistas ahora</button>
+        </div>
+        <div class="stats" style="margin-top:14px">
+          <span class="badge"><strong>${items.length}</strong> ítems</span>
+          <span class="badge"><strong>${nuestros.length}</strong> con cambios nuestros</span>
+          <span class="badge"><strong>${cuenta("insis")}</strong> con arreglo en INSIS</span>
+          <span class="badge"><strong>${cuenta("no_aplica")}</strong> sin imprimibles</span>
+          <span class="badge"><strong>${cuenta("sin_registro")}</strong> sin registro</span>
+        </div>
+        ${(rel.notas || []).length ? `<div class="rel-notes">${rel.notas.map(n => `<div class="rel-note">${escapeHtml(n)}</div>`).join("")}</div>` : ""}
+      </div>`;
+
+      const tocamos = `<div class="card"><h2>Lo que tocamos</h2>
+        <div class="cases-wrap" style="overflow-x:auto"><table class="cases">
+          <thead><tr><th>Ítem</th><th>Qué es</th><th>Vistas</th><th>Jasper</th><th>Commits</th></tr></thead>
+          <tbody>${nuestros.map(i => `<tr>
+            <td>${rItemCell(i)}</td>
+            <td class="wrap">${escapeHtml(i.titulo)}${rFlags(i)}${i.nota ? `<div class="muted" style="font-size:12px;margin-top:4px">${escapeHtml(i.nota)}</div>` : ""}</td>
+            <td>${(i.vistas || []).map(n => `<button type="button" class="chip-item" data-ir-vista="${escapeAttr(n)}" data-set="${set}" title="Ver en Comparar vistas">${escapeHtml(n)}</button>`).join("") || '<span class="muted">—</span>'}</td>
+            <td>${(i.jasper || []).map(j => `<span class="chip-item">${escapeHtml(j)}</span>`).join("") || '<span class="muted">—</span>'}</td>
+            <td>${(i.commits || []).map(c => `<a class="commit" href="${R_GITHUB_COMMIT}${encodeURIComponent(c)}" target="_blank" rel="noopener">${escapeHtml(c)}</a>`).join("") || '<span class="muted">—</span>'}</td>
+          </tr>`).join("") || '<tr><td colspan="5" class="muted">En este release no tocamos vistas ni Jasper.</td></tr>'}</tbody>
+        </table></div></div>`;
+
+      let foto = "";
+      if (rel.foto) {
+        const envs = ["UAT", "STST", "PROD"];
+        const estado = (m, repo) => !m ? '<span class="muted">—</span>'
+          : m === repo ? '<span class="pill pill-ok">Igual al repo</span>' : '<span class="pill pill-warn">Distinta</span>';
+        foto = `<div class="card"><h2>Foto de las vistas</h2>
+          <p class="muted" style="margin:0 0 12px">Tomada el ${fmtFecha(rel.foto.tomada)} a las ${escapeHtml((rel.foto.tomada || "").slice(11, 16))} contra <span class="mono">${escapeHtml(rel.foto.ref || "")}</span>: qué versión del repo iba en el pase y cómo estaba cada ambiente en ese momento.${Object.keys(rel.foto.errores || {}).length ? ` Sin datos de ${escapeHtml(Object.keys(rel.foto.errores).join(", "))}.` : ""}</p>
+          <div class="cases-wrap" style="overflow-x:auto"><table class="cases">
+            <thead><tr><th>Vista</th><th>Archivo del repo</th><th>Commit</th>${envs.map(e => `<th>${e}</th>`).join("")}</tr></thead>
+            <tbody>${Object.entries(rel.foto.vistas || {}).map(([n, f]) => `<tr>
+              <td><button type="button" class="chip-item" data-ir-vista="${escapeAttr(n)}" data-set="${set}" title="Ver en Comparar vistas">${escapeHtml(n)}</button></td>
+              <td class="mono">${escapeHtml(f.archivo || "—")}</td>
+              <td>${f.commit ? `<a class="commit" href="${R_GITHUB_COMMIT}${encodeURIComponent(f.commit.hash)}" target="_blank" rel="noopener" title="${escapeAttr(f.commit.subject)}">${escapeHtml(f.commit.hash)}</a><span class="muted" style="font-size:12px">${fmtFecha(f.commit.date)}</span>` : "—"}</td>
+              ${envs.map(e => `<td>${estado((f.md5 || {})[e], f.md5_repo)}</td>`).join("")}
+            </tr>`).join("")}</tbody>
+          </table></div></div>`;
+      }
+
+      const restoCard = `<div class="card"><h2>El resto del pase</h2>
+        <div class="cases-wrap" style="overflow-x:auto"><table class="cases">
+          <thead><tr><th>Ítem</th><th>Qué es</th><th>Nuestro lado</th></tr></thead>
+          <tbody>${resto.map(i => `<tr>
+            <td>${rItemCell(i)}</td>
+            <td class="wrap">${escapeHtml(i.titulo)}${rFlags(i)}${i.nota ? `<div class="muted" style="font-size:12px;margin-top:4px">${escapeHtml(i.nota)}</div>` : ""}</td>
+            <td style="white-space:nowrap"><span class="pill ${R_LADOS[i.lado]?.[1] || "pill-miss"}">${R_LADOS[i.lado]?.[0] || escapeHtml(i.lado || "")}</span></td>
+          </tr>`).join("") || '<tr><td colspan="3" class="muted">—</td></tr>'}</tbody>
+        </table></div></div>`;
+
+      $("relDetail").innerHTML = head + tocamos + foto + restoCard;
+    }
+
+    $("relListBody").addEventListener("click", (e) => {
+      const tr = e.target.closest("tr[data-fecha]");
+      if (tr) rOpen(tr.dataset.fecha);
+    });
+    $("relDetail").addEventListener("click", (e) => {
+      const v = e.target.closest("[data-ir-vista]");
+      if (v) { vIrA(v.dataset.set, v.dataset.irVista); return; }
+      const r = e.target.closest("[data-ir-release]");
+      if (r) vIrA(r.dataset.irRelease, null);
+    });
   </script>
 </body>
 </html>

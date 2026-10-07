@@ -99,25 +99,38 @@ def _quote_id(cur, policy_id):
     )
 
 
-def _receipts(cur, policy_no):
+def _receipts(cur, policy_id, policy_no):
     """Recibos/notas de credito del agreement (= policy_no), con el annex del
-    endoso al que corresponden (0/NULL = emision) y si todas sus
-    transacciones estan pagadas."""
+    endoso al que corresponden (0/NULL = emision) y si la version neteada de
+    Rec_Pag lo devuelve en blanco.
+
+    `en_blanco` replica el filtro de CALCULUS_V5_VIEW: una transaccion entra
+    si no esta pagada (paid_status N/P) o si es negativa con saldo 0 y razon
+    de endoso distinta de 11 (cambio de forma de pago). Un doc sin ninguna
+    transaccion que entre sale en blanco. Antes se miraba solo paid_status =
+    'Y' y una nota de credito pagada (PREMIUM-244217 en PROD, -116) se
+    avisaba en blanco aunque se genera bien."""
     if not policy_no:
         return []
     return _rows(
         cur,
-        "SELECT blc_doc.doc_number, blc_tr.annex, "
-        "  MIN(CASE WHEN blc_tr.paid_status = 'Y' THEN 1 ELSE 0 END) AS todo_pagado "
-        "FROM insis_gen_blc_v10.blc_items blc_it "
-        "JOIN insis_gen_blc_v10.blc_transactions blc_tr ON blc_tr.item_id = blc_it.item_id "
-        "JOIN insis_gen_blc_v10.blc_documents blc_doc ON blc_tr.doc_id = blc_doc.doc_id "
-        "JOIN insis_gen_blc_v10.blc_installments blc_ins ON blc_ins.transaction_id = blc_tr.transaction_id "
-        "WHERE blc_it.agreement = :ag AND blc_it.item_type = 'POLICY' "
-        "  AND blc_doc.doc_number IS NOT NULL "
-        "GROUP BY blc_doc.doc_number, blc_tr.annex "
-        "ORDER BY blc_doc.doc_number",
-        {"ag": policy_no},
+        "SELECT doc_number, annex, MIN(oculta) AS en_blanco FROM ("
+        "  SELECT blc_doc.doc_number, blc_tr.annex, "
+        "    CASE WHEN blc_tr.paid_status IN ('N', 'P') THEN 0 "
+        "         WHEN blc_tr.open_balance = 0 AND blc_tr.amount < 0 AND EXISTS ("
+        "           SELECT 1 FROM insis_gen_v10.gen_annex_reason ar "
+        "           WHERE ar.policy_id = :pid AND TO_CHAR(ar.annex_id) = blc_tr.annex "
+        "             AND ar.annex_reason != '11') THEN 0 "
+        "         ELSE 1 END AS oculta "
+        "  FROM insis_gen_blc_v10.blc_items blc_it "
+        "  JOIN insis_gen_blc_v10.blc_transactions blc_tr ON blc_tr.item_id = blc_it.item_id "
+        "  JOIN insis_gen_blc_v10.blc_documents blc_doc ON blc_tr.doc_id = blc_doc.doc_id "
+        "  JOIN insis_gen_blc_v10.blc_installments blc_ins ON blc_ins.transaction_id = blc_tr.transaction_id "
+        "  WHERE blc_it.agreement = :ag AND blc_it.item_type = 'POLICY' "
+        "    AND blc_doc.doc_number IS NOT NULL"
+        ") GROUP BY doc_number, annex "
+        "ORDER BY doc_number",
+        {"ag": policy_no, "pid": policy_id},
     )
 
 
@@ -245,7 +258,7 @@ def compute_documents(env_key: str, policy: dict) -> dict:
             # convertir, "0" no cuenta como emision y no matchea los annex_id
             # (int) de los endosos. generar-imprimibles tiene el mismo bug.
             recibos_por_annex: dict[int, list] = {}
-            for r in _receipts(cur, policy_no):
+            for r in _receipts(cur, policy_id, policy_no):
                 recibos_por_annex.setdefault(int(r["annex"] or 0), []).append(r)
             versiones = []
             if emitida:
@@ -259,12 +272,13 @@ def compute_documents(env_key: str, policy: dict) -> dict:
                 recibos = recibos_por_annex.get(annex, [])
                 if not recibos:
                     items.append({**_item("Rec_Pag", [], subtitulo=version, downloadable=False),
-                                  "placeholder": True})
+                                  "placeholder": True, "annex_id": annex})
                 for r in recibos:
                     doc = r["doc_number"]
-                    nota = ("Todas las cuotas pagadas: la versión neteada de Rec_Pag lo devuelve en blanco"
-                            if r["todo_pagado"] else None)
-                    items.append(_item("Rec_Pag", [doc], subtitulo=f"{version} — {doc}", nota=nota))
+                    nota = ("Todas sus cuotas están pagadas: la versión neteada de Rec_Pag lo devuelve en blanco"
+                            if r["en_blanco"] else None)
+                    items.append({**_item("Rec_Pag", [doc], subtitulo=f"{version} — {doc}", nota=nota),
+                                  "annex_id": annex})
 
             for c in _claims(cur, policy_id):
                 sub = f"{c['claim_regid'] or c['claim_id']} - {c['claim_type'] or ''}".strip(" -")
@@ -316,6 +330,11 @@ def blank_hint(report: str, params: list) -> str:
     if report == "Rec_Pag":
         return base + " En recibos, también pasa si todas las cuotas están pagadas (versión neteada)."
     if report in ("Car_Ind", "Car_Mul") and len(params) > 1 and str(params[1]) not in ("", "0"):
-        return ("La carátula de un endoso todavía está en desarrollo (solo en STST): en los demás "
-                "ambientes sale en blanco. " + base)
+        # CAR_IND_DANIOS_VIEW (desplegada en PROD el 06/10) solo arma filas de
+        # endoso para estas razones; el resto (p.ej. 55 aumento de suma
+        # asegurada, 38 endoso B libre) sale en blanco.
+        return ("La carátula de un endoso solo sale para algunos motivos: cambio de agente, de forma "
+                "de pago, de cliente/asegurado o de domicilio, corrección de nombre/RFC y asegurado "
+                "alterno. Para otros (p.ej. aumento de suma asegurada o endoso B libre) sale en blanco. "
+                + base)
     return base

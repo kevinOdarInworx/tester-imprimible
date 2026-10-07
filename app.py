@@ -23,6 +23,14 @@
   documentos" — que imprimibles tiene una poliza (documentos.py, port de
   generar-imprimibles) y su descarga, avisando si el PDF vino en blanco.
 - /pdf/<token>: sirve el PDF de una corrida anterior (para verlo/descargarlo).
+- /vistas/*: pestaña "Comparar vistas" — el texto de cualquier vista (todas
+  las del repo, las de un release o las que se agreguen) en cada ambiente y
+  en el repo INSOR (vistas.py, repo_views.py), y el diff entre dos de esas
+  versiones. Extraido de versiones-vistas-imprimibles. /vistas/pisar
+  instala en un ambiente la version del repo (instalar.py).
+- /releases, /releases/<fecha>: pestaña "Releases" — registro de que
+  tocamos de nuestro lado (vistas y Jasper) en cada pase a PROD (releases.py,
+  un JSON por release en releases/).
 
 Un solo usuario, sin persistencia entre reinicios: los PDFs de la corrida
 viven en memoria (ver _pdf_store).
@@ -40,8 +48,12 @@ from compare import compare_pdfs, pdf_stats
 from config.environments import ENVIRONMENTS
 from documentos import REPORTS as DOC_REPORTS, blank_hint, compute_documents, resolve as resolve_documents
 from printouts import PRINTOUTS_DIR, list_families as list_report_families
+import instalar
+import repo_views
 from reports import OIC_PASSWORD, fetch_report
+from releases import get_release, list_releases
 from resolver import list_annexes, resolve as resolve_policy
+from vistas import build_diff as build_view_diff, get_env_sources
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -52,6 +64,9 @@ app.json.sort_keys = False
 _pdf_store: dict[str, bytes] = {}
 _pdf_order: list[str] = []
 _PDF_STORE_MAX = 200
+
+# Fuente extra de la pestaña "Comparar vistas": el .sql de la vista en el repo.
+REPO_SOURCE = "REPO"
 
 
 def _store_pdf(pdf_bytes: bytes | None) -> str | None:
@@ -337,6 +352,105 @@ def pdf_route(token):
     if pdf_bytes is None:
         abort(404)
     return Response(pdf_bytes, mimetype="application/pdf")
+
+
+@app.route("/vistas/repo_info")
+def vistas_repo_info_route():
+    try:
+        return jsonify({"repo": repo_views.repo_info()})
+    except Exception as exc:  # repo no encontrado / git no instalado
+        return jsonify({"repo": {"error": f"{type(exc).__name__}: {exc}"}})
+
+
+@app.route("/vistas/repo_index")
+def vistas_repo_index_route():
+    try:
+        return jsonify({"views": sorted(repo_views.get_index())})
+    except Exception as exc:
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
+
+
+@app.route("/releases")
+def releases_route():
+    return jsonify({"releases": list_releases()})
+
+
+@app.route("/releases/<fecha>")
+def release_route(fecha):
+    try:
+        return jsonify(get_release(fecha))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 404
+
+
+@app.route("/vistas/fuente", methods=["POST"])
+def vistas_fuente_route():
+    """Las vistas pedidas en UNA fuente (un ambiente o REPO). El frontend llama
+    una vez por fuente en paralelo, asi un ambiente caido no frena al resto."""
+    data = request.get_json(silent=True) or {}
+    source = data.get("source", "")
+    # "Todas las vistas del repo" son ~80; el tope queda lejos del limite de
+    # 1000 elementos de un IN de Oracle.
+    names = [str(n) for n in (data.get("views") or [])][:500]
+    if not names:
+        return jsonify({"error": "Faltan las vistas."}), 400
+    try:
+        if source == REPO_SOURCE:
+            views = repo_views.get_repo_sources(names)
+        elif source in ENVIRONMENTS:
+            views = get_env_sources(source, names)
+        else:
+            return jsonify({"error": "Fuente invalida."}), 400
+    except Exception as exc:  # tunel / conexion / oracle / git
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
+    return jsonify({"source": source, "views": views})
+
+
+@app.route("/vistas/diff", methods=["POST"])
+def vistas_diff_route():
+    data = request.get_json(silent=True) or {}
+    return jsonify(build_view_diff(
+        data.get("sql_a") or "", data.get("sql_b") or "",
+        data.get("label_a") or "A", data.get("label_b") or "B",
+    ))
+
+
+@app.route("/vistas/repo_fetch", methods=["POST"])
+def vistas_repo_fetch_route():
+    try:
+        return jsonify({"repo": repo_views.fetch_origin()})
+    except Exception as exc:
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
+
+
+@app.route("/vistas/pisar_preview")
+def vistas_pisar_preview_route():
+    """El CREATE que se va a ejecutar (sin la query), para mostrarlo antes de confirmar."""
+    try:
+        rep = instalar.armar_ddl(request.args.get("view", ""))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
+    return jsonify({k: rep[k] for k in ("view", "schema", "header", "file", "commit", "md5")})
+
+
+@app.route("/vistas/pisar", methods=["POST"])
+def vistas_pisar_route():
+    data = request.get_json(silent=True) or {}
+    if data.get("env") not in ENVIRONMENTS:
+        return jsonify({"error": "Ambiente invalido."}), 400
+    try:
+        return jsonify(instalar.instalar(
+            data["env"], data.get("view", ""), data.get("md5_repo"), data.get("md5_env"),
+            data.get("confirmacion", ""),
+        ))
+    except instalar.Conflicto as exc:
+        return jsonify({"error": str(exc), "conflicto": True}), 409
+    except (ValueError, PermissionError) as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # oracle / tunel / git
+        return jsonify({"error": f"{type(exc).__name__}: {exc}" if not isinstance(exc, RuntimeError) else str(exc)}), 502
 
 
 if __name__ == "__main__":

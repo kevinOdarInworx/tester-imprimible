@@ -28,8 +28,8 @@ def extract_lines(pdf_bytes: bytes) -> list[str]:
 
 
 # Jasper imprime el numero de pagina en el pie aunque la vista no devuelva
-# filas: un PDF que solo dice "Pág. 1 de 1" sigue estando en blanco (visto en
-# PROD con Car_Ind de un endoso, funcionalidad que solo existe en STST).
+# filas: un PDF que solo dice "Pág. 1 de 1" sigue estando en blanco (visto con
+# Car_Ind de un endoso cuyo motivo no cubre la carátula por endoso).
 _PAGE_NUMBER = re.compile(r"(p[áa]g(ina)?\.?\s*)?\d+(\s*(de|/)\s*\d+)?", re.IGNORECASE)
 
 

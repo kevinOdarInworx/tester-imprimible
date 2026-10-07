@@ -1,0 +1,394 @@
+{
+  "fecha": "2026-10-06",
+  "nombre": "GDS - MX - VoBo liberación a Prod 06 de octubre de 2026",
+  "fuente": "Correo de VoBo de Hugo Alva Monterroso del 05/10/2026 (listado completo, 17 ítems). Lo que tocamos sale del contenido a liberar de cada ítem en Azure DevOps, de los commits del repo INSOR y del texto de las vistas en UAT, STST y PROD (revisado el 05 y 06/10/2026).",
+  "notas": [
+    "237275 redujo su alcance a la carátula de emisión: solo CAR_IND_AUTOS_VIEW y CAR_IND_DANIOS_VIEW. Los cambios de CAR_RC_USA_VIEW, VIDAUTO_VIEW y Vidauto.jrxml que nombran la US no van.",
+    "El arreglo de 325671 y 325715 en CAR_IND_AUTOS_VIEW lo hizo Emanuel Marinelli directo en STST el 23/09 y se subió al repo el 06/10 (commit da07eb1a).",
+    "237275 habilita en la carátula de emisión los 12 motivos de endoso de su descripción (A = autos, AD = autos y daños). Para PROD se sacaron del repo todos los candados de ambiente (sys_context DB_DOMAIN distinto de PROD): 62 cambio de cliente, 15 domicilio y 34 corrección de nombre en las dos vistas, que en PROD estaban con candado; 13 motor y placas y 44 número de serie en CAR_IND_AUTOS_VIEW y 2 asegurado alterno en CAR_IND_DANIOS_VIEW, que en PROD no estaban. La versión a instalar es la del repo; STST difiere solo en esos candados.",
+    "El Jasper Rec_Pag_master.jrxml de 287401 está en develop y no se pudo verificar en el servidor Jasper de PROD: confirmar ahí los subreportes del recibo neteado.",
+    "Los incidentes de L2 no tienen commits en INSOR ni ítems en Azure DevOps que los nombren."
+  ],
+  "items": [
+    {
+      "id": "237275",
+      "tipo": "US",
+      "track": "Evolutivo",
+      "titulo": "Mantenimiento - Versionamiento de imprimibles de endosos - CORE",
+      "lado": "imprimibles",
+      "vistas": [
+        "CAR_IND_AUTOS_VIEW",
+        "CAR_IND_DANIOS_VIEW"
+      ],
+      "jasper": [],
+      "commits": [
+        "1270ad13",
+        "d69944cf",
+        "63f8e0bf",
+        "9e23ab7a"
+      ],
+      "nota": "Solo la carátula de emisión (carind autos y daños), con los 12 motivos de endoso de la US y sin candados de PROD."
+    },
+    {
+      "id": "INC1108637",
+      "tipo": "Incidente",
+      "track": "L2",
+      "titulo": "Información de Póliza Duplicada",
+      "lado": "sin_registro"
+    },
+    {
+      "id": "287401",
+      "tipo": "US",
+      "track": "Evolutivo",
+      "titulo": "Imprimibles | IP050 | Ajustes a Recibos de Pago sobre Endosos por ajustes en la lógica de la IP050 - TRANSVERSAL - TODAS LAS LÍNEAS",
+      "lado": "imprimibles",
+      "vistas": [
+        "REC_NOT_NETEADO_VIEW"
+      ],
+      "jasper": [
+        "Rec_Pag/Rec_Pag_master.jrxml"
+      ],
+      "commits": [
+        "b34d9d5d",
+        "1db5a83b"
+      ],
+      "nota": "Rec_Pag_master apaga los subreportes viejos y prende los del recibo neteado (Rec_Pag_F1_Neteado.jrxml y Nota_Credito_Neteado.jrxml). También lleva los scripts de INSIS 660 y 755."
+    },
+    {
+      "id": "307900",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "titulo": "Imprimibles | IP050 | No permite terminar el endoso por preguntas del cuestionario que ya se cuentan con respuesta",
+      "lado": "no_aplica",
+      "nota": "Validación del cuestionario al cerrar el endoso (cust_pol_validations, INSIS). Dice Imprimibles en el título porque cuelga de 287401."
+    },
+    {
+      "id": "321848",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "titulo": "Imprimibles | IP050 | Ajustes a Recibos de Pago sobre Endosos por ajustes en la lógica de la IP050 | Se genera referencia OXXO con monto mayor a 10mil",
+      "lado": "insis",
+      "nota": "El recibo muestra la referencia OXXO que genera INSIS (BLC). Script de INSIS 755."
+    },
+    {
+      "id": "322232",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "titulo": "Mantenimiento - Versionamiento de imprimibles de endosos - Pick up individual - No genera caratula despues de endoso ni se modifica información",
+      "lado": "insis",
+      "nota": "INSIS no llamaba al imprimible; INSOR sí lo generaba. Script de INSIS 772."
+    },
+    {
+      "id": "322197",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "titulo": "Mantenimiento - Versionamiento de imprimibles de endosos - Pick up-Endoso cambio de agente- duplicidad de inciso en carátula",
+      "lado": "imprimibles",
+      "vistas": [
+        "CAR_IND_AUTOS_VIEW"
+      ],
+      "jasper": [],
+      "commits": [
+        "d231cd83"
+      ],
+      "nota": "Ajuste para el producto Pick up. También lleva el script de INSIS 779."
+    },
+    {
+      "id": "322198",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "titulo": "Mantenimiento - Versionamiento de imprimibles de endosos - Endoso cambio de agente-Recibo no muestra nuevo agente ni comisión",
+      "lado": "insis",
+      "nota": "INSIS mandaba a imprimir el recibo equivocado. Script de INSIS 783."
+    },
+    {
+      "id": "INC1108571",
+      "tipo": "Incidente",
+      "track": "L2",
+      "titulo": "Recibo incorrecto de endoso cambio forma de pago póliza 12/953/130356",
+      "lado": "sin_registro"
+    },
+    {
+      "id": "324725",
+      "tipo": "US",
+      "track": "Evolutivo",
+      "titulo": "GDS - Transversal - COMPLEMENTO A FUNCIONALIDAD DE FA DE CARGA MASIVA DAÑOS MincAI",
+      "lado": "no_aplica",
+      "nota": "Carga masiva de Daños (File Adapter)."
+    },
+    {
+      "id": "324623",
+      "tipo": "US",
+      "track": "Evolutivo",
+      "titulo": "Configuración de la cobertura RC Cruzada",
+      "lado": "no_aplica",
+      "nota": "Configuración de tarifa en INSIS."
+    },
+    {
+      "id": "INC1108281",
+      "tipo": "Incidente",
+      "track": "L2",
+      "titulo": "Incidencia en Generación de Referencia Bancaria | Póliza: 0_701_112069",
+      "lado": "sin_registro"
+    },
+    {
+      "id": "325945",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "titulo": "GDS - FA TRASPORTE - 2205 Transporte Pólizas Anuales (Pronóstico Anual)- Errores en Etapa C y U",
+      "lado": "no_aplica",
+      "nota": "Carga masiva de Daños (File Adapter)."
+    },
+    {
+      "id": "325949",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "titulo": "GDS - FA INDIVIDUAL -4001 MAQUINARIA SEGURA - Errores en Etapa C",
+      "lado": "no_aplica",
+      "nota": "Carga masiva de Daños (File Adapter)."
+    },
+    {
+      "id": "325951",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "titulo": "GDS - FA EMPRESARIAL-2102 Protección Empresarial - Errores en Etapa C",
+      "lado": "no_aplica",
+      "nota": "Carga masiva de Daños (File Adapter)."
+    },
+    {
+      "id": "325694",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "titulo": "Mantenimiento - Versionamiento de imprimibles de endosos - Transporte Pólizas Anuales (Pronóstico Anual)- Cambio de forma de pago",
+      "lado": "insis",
+      "nota": "BLC no tenía los montos del endoso. Script de INSIS 841."
+    },
+    {
+      "id": "INC1108696",
+      "tipo": "Incidente",
+      "track": "L2",
+      "titulo": "La tarifa de RC que se liberó 22 de septiembre está incorrecta.",
+      "lado": "no_aplica",
+      "nota": "Por el título es de tarifa (INSIS). No hay commits en INSOR ni ítems en Azure DevOps que lo nombren."
+    },
+    {
+      "id": "325941",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "titulo": "Configuración de la cobertura RC Cruzada - No se visualiza cobertura RC Cruzada seleccionada",
+      "lado": "no_aplica",
+      "nota": "Mapeo de la carga masiva de autos. Estaba en la planilla del pase pero no figura en el correo de VoBo.",
+      "en_correo": false
+    },
+    {
+      "id": "326970",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "titulo": "Interno - Mensaje de error para valores distintos a la los permitidos en RC Cruzada",
+      "lado": "no_aplica",
+      "nota": "Validación de la carga masiva. Estaba en la planilla del pase pero no figura en el correo de VoBo.",
+      "en_correo": false
+    },
+    {
+      "id": "325580",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "en_correo": false,
+      "incluido_por": "237275",
+      "titulo": "Mantenimiento - Versionamiento de imprimibles de endosos - Turistas Transfer - Se modifica sumas aseguradas en endoso Modificación número de serie",
+      "lado": "imprimibles",
+      "vistas": [
+        "CAR_IND_AUTOS_VIEW"
+      ],
+      "jasper": [],
+      "commits": [
+        "b96af706"
+      ],
+      "nota": "Va en la misma vista que 237275 y 322197: se instala junto con ellos."
+    },
+    {
+      "id": "325656",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "en_correo": false,
+      "incluido_por": "237275",
+      "titulo": "Mantenimiento - Versionamiento de imprimibles de endosos - Transporte de Pasajeros - Error en endoso Agregar asegurado alterno",
+      "lado": "imprimibles",
+      "vistas": [
+        "CAR_IND_AUTOS_VIEW"
+      ],
+      "jasper": [],
+      "commits": [
+        "35c1b6a5"
+      ],
+      "nota": "Mismo commit que 325738."
+    },
+    {
+      "id": "325738",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "en_correo": false,
+      "incluido_por": "237275",
+      "titulo": "Mantenimiento - Versionamiento de imprimibles de endosos - Pick up Carga - Cambio de cliente",
+      "lado": "imprimibles",
+      "vistas": [
+        "CAR_IND_AUTOS_VIEW"
+      ],
+      "jasper": [],
+      "commits": [
+        "35c1b6a5"
+      ]
+    },
+    {
+      "id": "325671",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "en_correo": false,
+      "incluido_por": "237275",
+      "titulo": "Mantenimiento - Versionamiento de imprimibles de endosos - Transporte de Pasajeros - Error en endoso Cambio de cliente",
+      "lado": "imprimibles",
+      "vistas": [
+        "CAR_IND_AUTOS_VIEW"
+      ],
+      "jasper": [],
+      "commits": [
+        "da07eb1a"
+      ],
+      "nota": "Arreglo de Emanuel Marinelli hecho en STST el 23/09; subido al repo el 06/10."
+    },
+    {
+      "id": "325715",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "en_correo": false,
+      "incluido_por": "237275",
+      "titulo": "Mantenimiento - Versionamiento de imprimibles de endosos - Pick Up Carga - Error en endoso Agregar asegurada alterno",
+      "lado": "imprimibles",
+      "vistas": [
+        "CAR_IND_AUTOS_VIEW"
+      ],
+      "jasper": [],
+      "commits": [
+        "da07eb1a"
+      ],
+      "nota": "Mismo arreglo que 325671."
+    },
+    {
+      "id": "326989",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "en_correo": false,
+      "confirmar": true,
+      "incluido_por": "324623",
+      "titulo": "Configuración de la cobertura RC Cruzada - Se generan en blanco imprimibles de póliza maestra",
+      "lado": "imprimibles",
+      "vistas": [
+        "CALCULUS_V6_VIEW"
+      ],
+      "jasper": [],
+      "commits": [
+        "e4a53cdb"
+      ],
+      "nota": "Ready for PROD e hijo de 324623, pero no figura en el correo: confirmar si va en este pase."
+    },
+    {
+      "id": "327497",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "en_correo": false,
+      "confirmar": true,
+      "titulo": "Endoso de cambio de cliente - Error en Cambio de forma de pago",
+      "lado": "imprimibles",
+      "vistas": [
+        "CALCULUS_V3_VIEW"
+      ],
+      "jasper": [],
+      "commits": [
+        "72957b81"
+      ],
+      "nota": "Ready for PROD pero no figura en el correo: confirmar si va en este pase."
+    }
+  ],
+  "foto": {
+    "tomada": "2026-10-06T09:09:40",
+    "ref": "origin/develop",
+    "errores": {},
+    "vistas": {
+      "CAR_IND_AUTOS_VIEW": {
+        "archivo": "GDS/FASE 1/car-ind-autos.sql",
+        "commit": {
+          "hash": "9e23ab7a",
+          "date": "2026-10-06",
+          "author": "Kevin Odar",
+          "subject": "despliegue en prod - sacando filtros de carind"
+        },
+        "md5_repo": "9795324ee7975a7ab49300d75d6e8b09",
+        "md5": {
+          "UAT": "2237b982a24573a57b09728f561aec46",
+          "STST": "9795324ee7975a7ab49300d75d6e8b09",
+          "PROD": "9795324ee7975a7ab49300d75d6e8b09"
+        }
+      },
+      "CAR_IND_DANIOS_VIEW": {
+        "archivo": "GDS/FASE 1/car_ind_danios.sql",
+        "commit": {
+          "hash": "9e23ab7a",
+          "date": "2026-10-06",
+          "author": "Kevin Odar",
+          "subject": "despliegue en prod - sacando filtros de carind"
+        },
+        "md5_repo": "7add1ffc56f7290c2470aaa9d804e014",
+        "md5": {
+          "UAT": "1a08f3c365bb6e863a3ed2fc068cde1a",
+          "STST": "7add1ffc56f7290c2470aaa9d804e014",
+          "PROD": "7add1ffc56f7290c2470aaa9d804e014"
+        }
+      },
+      "REC_NOT_NETEADO_VIEW": {
+        "archivo": "GDS/FASE 1/rec-pag_nota-cred-acumulativo.sql",
+        "commit": {
+          "hash": "68c42a7e",
+          "date": "2026-08-03",
+          "author": "kevin odar",
+          "subject": "mejora de performance rec pag - se cambia v2 a version definitiva"
+        },
+        "md5_repo": "6d99bc3c473ecf0281b26b38ef67d217",
+        "md5": {
+          "UAT": "5f27ad097466aa500dc3c1cb66cf208b",
+          "STST": "6d99bc3c473ecf0281b26b38ef67d217",
+          "PROD": "6d99bc3c473ecf0281b26b38ef67d217"
+        }
+      },
+      "CALCULUS_V6_VIEW": {
+        "archivo": "GDS/Complementarias/calculusV6.sql",
+        "commit": {
+          "hash": "e4a53cdb",
+          "date": "2026-10-01",
+          "author": "Kevin Odar",
+          "subject": "BUG 326989 car mul au - mejora de performance de querie calculus"
+        },
+        "md5_repo": "e06c1c045093452f77dc65598922da3e",
+        "md5": {
+          "UAT": "a419060339c04ecae0369b2a14317879",
+          "STST": "e06c1c045093452f77dc65598922da3e",
+          "PROD": "e06c1c045093452f77dc65598922da3e"
+        }
+      },
+      "CALCULUS_V3_VIEW": {
+        "archivo": "GDS/Complementarias/calculusV3.sql",
+        "commit": {
+          "hash": "72957b81",
+          "date": "2026-10-02",
+          "author": "Kevin Odar",
+          "subject": "BUG 327497 car ind - ajuste en monton subsecuentes"
+        },
+        "md5_repo": "698ddf1a7791a763d17abcf26db8a482",
+        "md5": {
+          "UAT": "e05bf922d12ba98641d33109557f3a54",
+          "STST": "698ddf1a7791a763d17abcf26db8a482",
+          "PROD": "698ddf1a7791a763d17abcf26db8a482"
+        }
+      }
+    }
+  }
+}
