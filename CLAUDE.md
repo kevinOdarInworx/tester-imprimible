@@ -210,6 +210,38 @@ Diferencias con generar-imprimibles, a partir de lo aprendido (skills
 No se agregaron `Car_Seg_Oblig`, `Car_RC_USA` ni `Car_Benef`: no hay una
 regla conocida de a qué pólizas corresponden.
 
+### "En INSIS": con qué parámetros generó INSIS cada imprimible
+
+Debajo de cada documento se muestra la **última llamada de INSIS a OIC** para
+ese imprimible (`_attach_insis` en `documentos.py`), leída de
+`insis_gen_v10.doc_documents` + `insis_cust_addon.cust_doc_printout_ctrl`
+(`payload_json`), y se comparan sus `reportParams` (no los `storageParams`,
+que solo dicen dónde se guarda) con los parámetros del botón:
+
+- **Sin reportParams** → Jasper genera sin filtro y lo que quedó en
+  Laserfiche está en blanco, aunque `result_state` sea OK y la pantalla diga
+  "Documento listo en Laserfiche". Caso que lo motivó: End_Ind
+  100000224652 / 3000104198 en PROD (14 llamadas, ninguna con reportParams;
+  el Car_Ind de la misma póliza sí los trae). En PROD, últimos 45 días: 8
+  pólizas con End_Ind así, además de Car_Mul_Autos* (bug 326989) y algunos
+  Rec_Pag de endoso.
+- **Parámetros distintos**, **Error** (`result_state` ≠ OK, con
+  `result_details`), **No llamado** (`doc_state` 1, el NO DISPONIBLE de
+  INSIS: INSIS ni siquiera llamó a OIC, no hay filas en
+  `cust_doc_printout_ctrl`) o **Sin registro**. "Parámetros OK" solo dice que INSIS pidió lo mismo que el botón:
+  si el botón sale en blanco, lo de INSIS también.
+- `reportParams` viene como lista o como un solo objeto (Cot_*,
+  Car_Mul_Autos) y puede traer `null`.
+- Cómo se ubica cada imprimible en INSIS (`_insis_key`): Car_Ind/Car_Mul/
+  End_Ind por `policy_id` + `annex_id`; Car_Mul_Autos_Maestra por la maestra;
+  Car_Mul_Autos por cualquier MASTER del engagement (en cualquier estado);
+  Cot_* por la póliza −4; Rec_Pag por `policy_id` + annex del recibo,
+  prefiriendo la llamada cuyo `string_param1` es ese doc_number (un endoso
+  puede tener varios recibos). `doc_id` viene truncado (`Car_Mul_Au`,
+  `Car_Ma_MA`, `Rec_Pag_Ct`…) y se mapea con `_DOC_ID_REPORT`. SIN_04 no lo
+  genera INSIS y no se muestra.
+- "ver llamada" muestra el `payload_json` crudo de esa llamada.
+
 ## Pestaña "Comparar vistas"
 
 Comparador de vistas extraído de `versiones-vistas-imprimibles` (pestaña

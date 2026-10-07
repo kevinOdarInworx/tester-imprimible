@@ -13,6 +13,7 @@ con estos cambios:
 """
 from __future__ import annotations
 
+import json
 from decimal import Decimal
 
 from db import get_connection
@@ -143,6 +144,144 @@ def _claims(cur, policy_id):
     )
 
 
+# --- Log de INSIS: con que parametros genero INSIS cada imprimible ---
+#
+# INSIS guarda cada documento en doc_documents y cada llamada a OIC en
+# cust_doc_printout_ctrl (payload_json). Si la llamada no trae "reportParams"
+# (o trae otros valores), Jasper genera sin filtro y el PDF que queda en
+# Laserfiche sale en blanco aunque result_state diga OK y la pantalla diga
+# "Documento listo en Laserfiche". "storageParams" solo dice donde se guarda.
+
+# doc_id (truncado) -> reporte OIC. Los demas doc_id coinciden con el reporte.
+_DOC_ID_REPORT = {
+    "Car_Mul_Au": "Car_Mul_Autos",
+    "Car_Ma_MA": "Car_Mul_Autos_Maestra",
+    "Cot_Mul_Au": "Cot_Mul_Autos",
+    "Rec_Pag_Ag": "Rec_Pag",
+    "Rec_Pag_Ct": "Rec_Pag",
+}
+
+
+def _insis_calls(cur, policy_ids) -> list[dict]:
+    policy_ids = sorted({p for p in policy_ids if p is not None})
+    if not policy_ids:
+        return []
+    binds = {f"p{i}": p for i, p in enumerate(policy_ids)}
+    return _rows(
+        cur,
+        "SELECT doc.policy_id, doc.annex_id, doc.doc_id, doc.doc_state, ctrl.process_type, "
+        "  ctrl.result_state, DBMS_LOB.SUBSTR(ctrl.result_details, 300, 1) AS result_details, "
+        "  ctrl.payload_json, TO_CHAR(ctrl.start_time, 'DD/MM/YYYY HH24:MI') AS fecha, "
+        "  ctrl.start_time, ctrl.created_by "
+        "FROM insis_gen_v10.doc_documents doc "
+        "LEFT JOIN insis_cust_addon.cust_doc_printout_ctrl ctrl ON ctrl.doc_seq = doc.doc_seq "
+        f"WHERE doc.policy_id IN ({', '.join(':' + k for k in binds)})",
+        binds,
+    )
+
+
+def _report_params(payload):
+    """Valores de reportParams en orden (string_param1, 2, ...), o None si
+    la llamada no los trae. Viene como lista o como un solo objeto."""
+    try:
+        rp = json.loads(payload or "{}").get("reportParams")
+    except ValueError:
+        return None
+    if not rp:
+        return None
+    if isinstance(rp, dict):
+        rp = [rp]
+    by_name = {p.get("paramName"): p.get("paramValue") for p in rp if isinstance(p, dict)}
+    n = max((int(k[len("string_param"):]) for k in by_name
+             if k and k.startswith("string_param") and k[len("string_param"):].isdigit()), default=0)
+    return [by_name.get(f"string_param{i}") for i in range(1, n + 1)]
+
+
+def _fmt_params(values) -> str:
+    return ", ".join("vacío" if v in (None, "") else str(v) for v in values)
+
+
+def _insis_key(it, policy_id, master_ids):
+    """(policy_ids, annex_id) con los que INSIS guarda este imprimible, o
+    None si INSIS no lo genera (siniestros)."""
+    report, params = it["report"], it["params"]
+    if report in ("Car_Ind", "Car_Mul", "End_Ind"):
+        return [params[0]], params[1]
+    if report == "Car_Mul_Autos_Maestra":
+        return [params[1]], 0
+    if report == "Car_Mul_Autos":
+        return master_ids, 0
+    if report.startswith("Cot_"):
+        return [policy_id], 0
+    if report == "Rec_Pag":
+        return [policy_id], it.get("annex_id", 0)
+    return None
+
+
+def _insis_estado(it, calls) -> dict:
+    llamadas = sorted((c for c in calls if c["start_time"]), key=lambda c: c["start_time"])
+    if not llamadas:
+        if any(c["doc_state"] == 2 for c in calls):
+            return {"estado": "sin_registro",
+                    "mensaje": "INSIS lo tiene guardado pero no hay registro de la llamada: no se pueden revisar los parámetros."}
+        if calls:
+            return {"estado": "no_generado",
+                    "mensaje": "INSIS nunca lo llamó: en INSIS figura NO DISPONIBLE."}
+        return {"estado": "sin_registro", "mensaje": "INSIS no tiene registro de este imprimible."}
+    esperado = it["params"]
+    if it["report"] == "Rec_Pag":
+        # Un endoso puede tener varios recibos y cada uno es otra llamada.
+        propias = [c for c in llamadas if (_report_params(c["payload_json"]) or [None])[0] == esperado[0]]
+        llamadas = propias or llamadas
+    c = llamadas[-1]
+    base = {"fecha": c["fecha"], "quien": c["created_by"], "proceso": c["process_type"],
+            "llamadas": len(llamadas), "payload": c["payload_json"]}
+    cuando = f"INSIS ({c['fecha']}, {c['created_by']})"
+    if c["result_state"] != "OK":
+        return {**base, "estado": "error",
+                "mensaje": f"{cuando} dio {c['result_state']}: {c['result_details'] or 'sin detalle'}"}
+    enviados = _report_params(c["payload_json"])
+    if enviados is None:
+        return {**base, "estado": "sin_params",
+                "mensaje": f"{cuando} no mandó reportParams: el PDF que guardó está en blanco."}
+    if (len(enviados) < len(esperado)
+            or any(str(e) != str(s) for e, s in zip(esperado, enviados))):
+        return {**base, "estado": "distintos",
+                "mensaje": (f"{cuando} mandó {_fmt_params(enviados)} y este botón manda "
+                            f"{_fmt_params(esperado)}: lo que guardó no es este documento.")}
+    return {**base, "estado": "ok",
+            "mensaje": f"{cuando} mandó los mismos parámetros ({_fmt_params(enviados)})."}
+
+
+def _all_master_ids(cur, engagement_id) -> list:
+    """Todas las MASTER del engagement, en cualquier estado: INSIS guarda el
+    Car_Mul_Autos bajo la maestra aunque despues cambie de estado."""
+    if not engagement_id:
+        return []
+    return [r["policy_id"] for r in _rows(
+        cur,
+        "SELECT DISTINCT policy_id FROM insis_gen_v10.policy_eng_policies "
+        "WHERE engagement_id = :e AND eng_pol_type = 'MASTER'",
+        {"e": engagement_id},
+    )]
+
+
+def _attach_insis(cur, items, policy_id, master_ids) -> None:
+    keys = {}
+    for i, it in enumerate(items):
+        if not it.get("placeholder"):
+            key = _insis_key(it, policy_id, master_ids)
+            if key:
+                keys[i] = key
+    calls = _insis_calls(cur, [p for pids, _ in keys.values() for p in pids])
+    for i, (pids, annex) in keys.items():
+        report = items[i]["report"]
+        propias = [c for c in calls
+                   if _DOC_ID_REPORT.get(c["doc_id"], c["doc_id"]) == report
+                   and c["policy_id"] in pids and int(c["annex_id"] or 0) == int(annex or 0)]
+        items[i]["insis"] = _insis_estado(items[i], propias)
+
+
 def _item(report, params, subtitulo=None, nota=None, downloadable=True, label=None):
     default_label, grupo = REPORTS[report]
     return {
@@ -170,7 +309,8 @@ def compute_for_engagement(env_key: str, engagement_id) -> dict:
     with get_connection(env_key) as conn:
         with conn.cursor() as cur:
             masters = _masters(cur, engagement_id)
-    items = [_item("Car_Mul_Autos", [engagement_id])] + _maestra_items(engagement_id, masters)
+            items = [_item("Car_Mul_Autos", [engagement_id])] + _maestra_items(engagement_id, masters)
+            _attach_insis(cur, items, None, _all_master_ids(cur, engagement_id))
     return {"producto": "autos", "engagement_id": engagement_id, "masters": len(masters), "items": items}
 
 
@@ -284,6 +424,8 @@ def compute_documents(env_key: str, policy: dict) -> dict:
                 sub = f"{c['claim_regid'] or c['claim_id']} - {c['claim_type'] or ''}".strip(" -")
                 items.append(_item("SIN_04", [c["claim_id"]], subtitulo=sub,
                                    nota="Los demás SIN_0X piden string_param2/3 sin mapear"))
+
+            _attach_insis(cur, items, policy_id, _all_master_ids(cur, engagement_id))
 
     return {
         "policy_id": policy_id,

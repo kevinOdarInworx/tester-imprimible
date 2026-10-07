@@ -197,6 +197,10 @@
     .doc-row { display: flex; align-items: center; gap: 14px; padding: 11px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 8px; background: var(--surface-2); }
     .doc-row.sub { margin-left: 16px; }
     .doc-row.placeholder { background: none; border-style: dashed; padding-top: 9px; padding-bottom: 9px; }
+    .doc-insis { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); font-size: 12.5px; color: var(--text-muted); }
+    .doc-insis .pill { margin-right: 8px; }
+    .doc-insis-k { font-weight: 600; color: var(--text); margin-right: 8px; }
+    .insis-log { margin: 6px 0 0; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 11.5px; white-space: pre-wrap; word-break: break-all; color: var(--text); }
     .doc-row.placeholder .doc-t { color: var(--text-muted); }
     .doc-info { flex: 1; min-width: 0; }
     .doc-t { font-size: 13.5px; font-weight: 600; }
@@ -1517,12 +1521,44 @@
             ${it.annex_id != null ? `<div class="doc-params">annex_id ${it.annex_id}</div>` : ""}
             ${it.nota ? `<div class="doc-note">${escapeHtml(it.nota)}</div>` : ""}
             <div class="doc-result"></div>
+            ${insisHtml(it.insis)}
           </div>
           ${it.downloadable
             ? '<button class="secondary doc-btn">Descargar PDF</button>'
             : '<button class="secondary" disabled>No disponible</button>'}
         </div>`;
     }
+
+    // Ultima llamada de INSIS a OIC para este imprimible (documentos.py,
+    // _insis_estado): si no mando reportParams o mando otros, lo que quedo
+    // guardado en INSIS no es lo que genera el boton de al lado.
+    const INSIS_PILL = {
+      ok: ["pill-ok", "✓ Parámetros OK"],
+      sin_params: ["pill-bad", "✕ Sin reportParams"],
+      distintos: ["pill-bad", "✕ Parámetros distintos"],
+      error: ["pill-bad", "✕ Error"],
+      no_generado: ["pill-warn", "⚠ No llamado"],
+      sin_registro: ["pill-miss", "Sin registro"],
+    };
+
+    function insisHtml(ins) {
+      if (!ins) return "";
+      const [cls, txt] = INSIS_PILL[ins.estado] || ["pill-miss", ins.estado];
+      const log = ins.payload
+        ? ` <button class="linklike insis-log-btn" type="button">ver llamada</button>`
+          + `<pre class="insis-log" hidden>${escapeHtml(ins.payload)}</pre>`
+        : "";
+      return `<div class="doc-insis"><span class="doc-insis-k">En INSIS:</span>`
+        + `<span class="pill ${cls}">${txt}</span>${escapeHtml(ins.mensaje)}${log}</div>`;
+    }
+
+    docGroups.addEventListener("click", (e) => {
+      const btn = e.target.closest(".insis-log-btn");
+      if (!btn) return;
+      const pre = btn.nextElementSibling;
+      pre.hidden = !pre.hidden;
+      btn.textContent = pre.hidden ? "ver llamada" : "ocultar llamada";
+    });
 
     async function descargarDocumento(row) {
       const it = docItems[+row.dataset.idx];
