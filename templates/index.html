@@ -280,6 +280,14 @@
     .item-flags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
     .item-flags .pill { font-size: 11.5px; padding: 2px 9px; }
     table.cases td.wrap { white-space: normal; min-width: 220px; }
+    .eng-block + .eng-block { margin-top: 18px; }
+    .eng-head { font-size: 14px; margin-bottom: 6px; }
+    .eng-resumen { font-size: 13.5px; margin-bottom: 10px; }
+    table.eng-tree tr.eng-master { background: var(--surface-2); font-weight: 700; }
+    table.eng-tree tbody tr.sel { background: var(--primary-soft); }
+    table.eng-tree td.eng-rol { text-align: left; white-space: nowrap; }
+    table.eng-tree tr.eng-dep td.eng-rol { padding-left: 34px; }
+    .eng-buscada { color: var(--primary); font-weight: 700; font-size: 12px; margin-left: 6px; }
   </style>
 </head>
 <body>
@@ -392,6 +400,11 @@
           <tbody id="prResultsBody"></tbody>
         </table>
       </div>
+    </div>
+
+    <div class="card" id="engCard" style="display:none">
+      <h2>Engagement</h2>
+      <div id="engBody"></div>
     </div>
 
     <div class="card" id="annexesCard" style="display:none">
@@ -640,6 +653,7 @@
     const usarPolizasRow = $("usarPolizasRow"), btnUsarPolizas = $("btnUsarPolizas");
     const prResultsHead = $("prResultsHead");
     const annexesCard = $("annexesCard"), annexesBody = $("annexesBody"), annexesHint = $("annexesHint");
+    const engCard = $("engCard"), engBody = $("engBody");
     const docIdent = $("docIdent"), btnDocResolver = $("btnDocResolver"), docHint = $("docHint");
     const docMatchesCard = $("docMatchesCard"), docMatchesBody = $("docMatchesBody");
     const docListCard = $("docListCard"), docMeta = $("docMeta"), docGroups = $("docGroups");
@@ -813,7 +827,9 @@
       const value = polIdent.value.trim();
       if (!value) { polHint.innerHTML = '<span class="error">Ingresá un identificador.</span>'; return; }
       btnResolverPoliza.disabled = true; btnResolverPoliza.textContent = "Resolviendo…";
+      ocrHint.innerHTML = ""; // el aviso de la imagen anterior (p.ej. un OCR fallido) ya no aplica
       prResultsCard.style.display = "none";
+      engCard.style.display = "none";
       annexesCard.style.display = "none";
       usarPolizasRow.style.display = "none";
       polHint.innerHTML = '<span class="spinner"></span> Cargando…';
@@ -838,6 +854,10 @@
           : `${policyResults.length} póliza(s) encontradas.`;
         renderPolicyResults();
         prResultsCard.style.display = "block";
+        // Buscando el engagement mismo ya se listan todas sus polizas: no
+        // hay una "buscada" que resaltar.
+        renderEngagements(data.engagements || [],
+          new Set(data.engagement_id ? [] : policyResults.map(p => p.policy_id)));
         usarPolizasRow.style.display = "block";
         cargarEndosos([...new Set(policyResults.map(p => p.policy_id))]);
       } catch (err) {
@@ -845,6 +865,54 @@
       } finally {
         btnResolverPoliza.disabled = false; btnResolverPoliza.textContent = "Resolver póliza";
       }
+    }
+
+    // Recuadro "Engagement" (autos multinciso): maestras y sus incisos, con la
+    // poliza buscada resaltada. Aparte de "Pólizas encontradas" porque esa
+    // tabla sirve para cualquier poliza y la mayoria no es de un engagement.
+    // Un engagement puede tener hasta 2000 incisos: por maestra se muestran
+    // los primeros ENG_MAX_INCISOS, mas los buscados.
+    const ENG_MAX_INCISOS = 10;
+
+    function renderEngagements(engs, buscadas) {
+      if (!engs.length) { engCard.style.display = "none"; return; }
+      const fila = (p, rol, clase) => `
+        <tr class="${clase}${buscadas.has(p.policy_id) ? " sel" : ""}">
+          <td class="eng-rol">${rol}${buscadas.has(p.policy_id) ? '<span class="eng-buscada">← buscada</span>' : ""}</td>
+          <td>${p.policy_id}</td>
+          <td>${p.policy_no ?? "—"}</td>
+          <td>${p.insr_type ?? "—"}</td>
+          <td>${p.policy_state ?? "—"}</td>
+        </tr>`;
+      const incisos = list => {
+        const visibles = list.filter((d, i) => i < ENG_MAX_INCISOS || buscadas.has(d.policy_id));
+        const resto = list.length - visibles.length;
+        return visibles.map(d => fila(d, `└ Inciso ${d.inciso ?? "?"}`, "eng-dep")).join("")
+          + (resto > 0 ? `<tr class="eng-dep"><td class="eng-rol muted" colspan="5">… y ${resto} inciso(s) más</td></tr>` : "");
+      };
+      engBody.innerHTML = engs.map(e => {
+        const resumen = [];
+        e.masters.forEach(m => {
+          if (buscadas.has(m.policy_id)) resumen.push(`${m.policy_no ?? m.policy_id} es una maestra del engagement, con ${m.incisos.length} inciso(s).`);
+          m.incisos.filter(d => buscadas.has(d.policy_id)).forEach(d =>
+            resumen.push(`${d.policy_no ?? d.policy_id} es el inciso ${d.inciso ?? "?"} de la maestra <strong>${m.policy_no ?? m.policy_id}</strong> (policy_id ${m.policy_id}).`));
+        });
+        return `
+          <div class="eng-block">
+            <div class="eng-head">Engagement <strong>${e.engagement_id}</strong> · ${e.masters.length} maestra(s) · ${e.incisos} inciso(s)</div>
+            ${resumen.map(r => `<div class="eng-resumen">${r}</div>`).join("")}
+            <div class="cases-wrap">
+              <table class="cases centered eng-tree">
+                <thead><tr><th>Rol</th><th>Policy ID</th><th>Policy No</th><th>INSR_TYPE</th><th>Policy State</th></tr></thead>
+                <tbody>
+                  ${e.masters.map(m => fila(m, "Maestra", "eng-master") + incisos(m.incisos)).join("")}
+                  ${e.sin_maestra.length ? `<tr class="eng-master"><td class="eng-rol" colspan="5">Sin maestra en el engagement</td></tr>` + incisos(e.sin_maestra) : ""}
+                </tbody>
+              </table>
+            </div>
+          </div>`;
+      }).join("");
+      engCard.style.display = "block";
     }
 
     // Igual que la caratula de generar-imprimibles, que ademas de la emision
@@ -1069,6 +1137,7 @@
       if (!selectedProductCodes.length) { prHint.innerHTML = '<span class="error">Elegí un producto.</span>'; return; }
       btnBuscarPolizas.disabled = true; btnBuscarPolizas.textContent = "Buscando…";
       prResultsCard.style.display = "none";
+      engCard.style.display = "none";
       annexesCard.style.display = "none";
       usarPolizasRow.style.display = "none";
       prHint.innerHTML = '<span class="spinner"></span> Cargando…';

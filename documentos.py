@@ -58,7 +58,19 @@ def _product(insr_type) -> str:
 
 
 def _count_incisos_danios(cur, policy_id) -> int:
-    n = _scalar(cur, "SELECT COUNT(*) FROM INSOR_GDS.INCISOS_VIEW WHERE POLICY_ID = :p", {"p": policy_id})
+    """En daños cada inciso es un objeto asegurado (insured_object) de la
+    emision. Es la misma regla con la que INSIS elige Car_Mul/Cot_Mul (mas
+    de 1) o Car_Ind/Cot_Ind: coincide en todas las polizas de PROD con el
+    documento guardado (7408 caratulas y 15267 cotizaciones, 12/10). No se
+    cuentan los endosos: un endoso que agrega objetos no cambia lo que INSIS
+    eligio al emitir (~380 polizas). Antes se usaba INSOR_GDS.INCISOS_VIEW,
+    que devuelve 0 en Obra Civil (0300209967/0141027/00 en STST: 8 objetos)."""
+    n = _scalar(
+        cur,
+        "SELECT COUNT(DISTINCT object_id) FROM insis_gen_v10.insured_object "
+        "WHERE policy_id = :p AND annex_id = 0",
+        {"p": policy_id},
+    )
     return int(n or 0)
 
 

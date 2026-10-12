@@ -197,6 +197,52 @@ def engagement_of_policies(env_key: str, policy_ids) -> dict:
             }
 
 
+def engagement_tree(env_key: str, engagement_ids) -> list[dict]:
+    """Estructura de cada engagement de autos multinciso, para el recuadro
+    "Engagement": sus maestras y, debajo de cada una, sus incisos
+    (DEPENDENT por master_policy_id; el numero de inciso es policy.attr5).
+    Un engagement puede tener varias maestras (una por producto, p.ej.
+    880000000025060 en STST: 1020/1030/1055) y hasta 2000 incisos."""
+    engagement_ids = sorted({int(e) for e in engagement_ids if e is not None})
+    if not engagement_ids:
+        return []
+    binds = {f"e{i}": e for i, e in enumerate(engagement_ids)}
+    with get_connection(env_key) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT DISTINCT pep.engagement_id, pep.policy_id, pep.eng_pol_type, pep.master_policy_id, "
+                "  po.policy_no, po.insr_type, po.policy_state, po.attr5 AS inciso "
+                "FROM insis_gen_v10.policy_eng_policies pep "
+                "JOIN insis_gen_v10.policy po ON po.policy_id = pep.policy_id "
+                f"WHERE pep.engagement_id IN ({', '.join(':' + k for k in binds)}) "
+                "  AND pep.eng_pol_type IN ('MASTER', 'DEPENDENT')",
+                binds,
+            )
+            cols = [d[0].lower() for d in cur.description]
+            rows = [{c: _serialize(v) for c, v in zip(cols, r)} for r in cur.fetchall()]
+
+    def orden_inciso(r):
+        n = str(r["inciso"] or "")
+        return (0, int(n), r["policy_id"]) if n.isdigit() else (1, 0, r["policy_id"])
+
+    tree = []
+    for eng in engagement_ids:
+        propias = [r for r in rows if r["engagement_id"] == eng]
+        masters = sorted((r for r in propias if r["eng_pol_type"] == "MASTER"), key=lambda r: r["policy_id"])
+        deps = sorted((r for r in propias if r["eng_pol_type"] == "DEPENDENT"), key=orden_inciso)
+        ids_master = {m["policy_id"] for m in masters}
+        tree.append({
+            "engagement_id": eng,
+            "masters": [{**m, "incisos": [d for d in deps if d["master_policy_id"] == m["policy_id"]]}
+                        for m in masters],
+            # Incisos cuya maestra no esta en el engagement (no visto en PROD,
+            # donde todos los DEPENDENT tienen master_policy_id).
+            "sin_maestra": [d for d in deps if d["master_policy_id"] not in ids_master],
+            "incisos": len(deps),
+        })
+    return tree
+
+
 def list_annexes(env_key: str, policy_id) -> list[dict]:
     """Endosos de una poliza. Sale de insor_gds.annex_details_view y no de
     CONSUTA_DE_ENDOSOS_VIEW (la que usa _endosos en generar-imprimibles):
@@ -256,4 +302,6 @@ def resolve(env_key: str, raw: str) -> dict:
         engs = engagement_of_policies(env_key, [m["policy_id"] for m in sin_engagement])
         for m in sin_engagement:
             m.update(engs.get(m["policy_id"], {}))
+    result["engagements"] = engagement_tree(env_key, [
+        m.get("engagement_id") for m in matches if str(m.get("insr_type") or "").startswith("1")])
     return result

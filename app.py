@@ -195,6 +195,7 @@ def resolve_policy_route():
         "cases": cases,
         "engagement_id": result.get("engagement_id"),
         "quote_id": result.get("quote_id"),
+        "engagements": result.get("engagements", []),
     })
 
 

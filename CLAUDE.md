@@ -72,6 +72,18 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
      también tienen filas MASTER en `policy_eng_policies`
      (0600201107/0135867/00 en PROD) y no son multinciso de autos.
 
+     La relación entre ellos va en un recuadro aparte, **"Engagement"**
+     (entre "Pólizas encontradas" y "Endosos"), no como columnas de la tabla:
+     esa tabla es para cualquier póliza y la mayoría no está en un
+     engagement. `engagement_tree` (`resolver.py`, viene en la misma
+     respuesta de `/resolve_policy` como `engagements`) arma cada maestra con
+     sus incisos (DEPENDENT por `master_policy_id`, número de inciso =
+     `policy.attr5`). Un engagement puede tener varias maestras (una por
+     producto: STST 880000000025060 tiene 1020/1030/1055) y hasta 2000
+     incisos, así que por maestra se muestran 10 + los buscados. La póliza
+     buscada se resalta y arriba dice de qué maestra es inciso; buscando el
+     engagement mismo no se resalta nada (ya están todas en la tabla).
+
      Después de resolver, el frontend encadena `/policy_annexes`
      (`list_annexes` en `resolver.py`) con los `policy_id` encontrados y
      muestra la tarjeta "Endosos" (annex_id, annex_no, tipo endoso,
@@ -181,6 +193,15 @@ Diferencias con generar-imprimibles, a partir de lo aprendido (skills
   INSIS→RAWDB de ~3-10 s en pólizas recién emitidas).
 - **HTTP 500 sin cuerpo:** se explica que es reporte no desplegado en el
   ambiente o `.jrxml` que explota con esos datos (OIC no da la traza).
+- **Incisos de daños:** en daños no hay maestra/dependiente; la póliza es
+  común y cada inciso es un objeto asegurado. `_count_incisos_danios`
+  cuenta los `object_id` distintos de `insured_object` en el annex 0, y con
+  más de 1 ofrece Car_Mul (estado ≥ 0) o Cot_Mul (−4). Es la regla con la que
+  elige INSIS: coincide en todas las pólizas de PROD con el documento
+  guardado (7408 carátulas y 15267 cotizaciones, 12/10). Contar también los
+  endosos fallaría en ~380 (endosos que agregan objetos después de emitir).
+  Antes se contaba `INSOR_GDS.INCISOS_VIEW`, que da 0 en Obra Civil
+  (0300209967/0141027/00 en STST, 8 objetos: ofrecía Car_Ind).
 - **Recibos pagados:** `_receipts` calcula `en_blanco` con el mismo filtro
   que `CALCULUS_V5_VIEW` (versión neteada de `Rec_Pag`, en STST y PROD): una
   transacción entra si no está pagada (`paid_status` N/P) **o** si es
