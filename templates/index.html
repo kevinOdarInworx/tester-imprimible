@@ -755,26 +755,108 @@
       }
     });
 
+    // Identificador en el texto leido. Primero la forma exacta de policy_lot
+    // (2/3/4-7 digitos) o policy_no (10/7/2), tolerando que la "/" se lea
+    // como espacio, "|", "\", "l", "I", "!" o un parentesis/corchete (pasa
+    // con capturas poco nitidas: "00/414 144674", "00/414 [144674"); se
+    // devuelve normalizado con "/". Despues
+    // cualquier a/b/c con "/" literal, y como ultimo recurso una tira de 9+
+    // digitos (policy_id, quote_id, engagement_id). La forma exacta va
+    // primero para que una fecha (19/10/2026) no le gane a la poliza.
+    function extraerIdentificador(text) {
+      const sep = String.raw`(?:\s*[\/|\\lIi!\[\](){}]\s*|\s+)`;
+      for (const [a, b, c] of [[2, 3, "4,7"], [10, 7, 2]]) {
+        const re = new RegExp(String.raw`(?<![\d\/])(\d{${a}})${sep}(\d{${b}})${sep}(\d{${c}})(?![\d\/])`);
+        const m = text.match(re);
+        if (m) return `${m[1]}/${m[2]}/${m[3]}`;
+      }
+      const slash = text.match(/\d+\/\d+\/\d+/);
+      if (slash) return slash[0];
+      const digits = text.match(/\b\d{9,}\b/);
+      return digits ? digits[0] : null;
+    }
+
+    // El OCR confunde digitos (4 como 6 u 8) y eso no se arregla con la
+    // imagen: se valida lo leido contra el ambiente (/ocr_candidates). Si no
+    // existe tal cual, se carga el parecido que si existe y se avisa que se
+    // corrigio; si hay varios igual de parecidos, se ofrecen para elegir.
+    async function validarOcr(leido) {
+      const env = envEl.value;
+      const extraido = `Extraído de la imagen: <strong>${escapeHtml(leido)}</strong>`;
+      ocrHint.innerHTML = `${extraido} — <span class="spinner"></span> verificando en ${escapeHtml(env)}…`;
+      let data;
+      try {
+        const res = await fetch("/ocr_candidates", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ env, value: leido }),
+        });
+        data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Error");
+      } catch (err) {
+        ocrHint.innerHTML = `${extraido} — no se pudo verificar en ${escapeHtml(env)}; revisalo y apretá "Resolver póliza".`;
+        return;
+      }
+      const cands = data.candidatos || [];
+      if (!data.aplica) {
+        ocrHint.innerHTML = `${extraido} — revisá y apretá "Resolver póliza".`;
+      } else if (data.exacto) {
+        ocrHint.innerHTML = `${extraido} — existe en ${escapeHtml(env)}; apretá "Resolver póliza".`;
+      } else if (cands.length) {
+        const mejor = cands[0];
+        polIdent.value = mejor.valor;
+        const empatados = cands.filter(c => c.cambios === mejor.cambios && c.valor !== mejor.valor);
+        ocrHint.innerHTML =
+          `La imagen se leyó <strong>${escapeHtml(leido)}</strong>, que no existe en ${escapeHtml(env)}. ` +
+          `Se cargó <strong>${escapeHtml(mejor.valor)}</strong>, el más parecido que existe ` +
+          `(${mejor.cambios} dígito(s) distinto(s): el OCR confunde 4, 6 y 8). Revisalo y apretá "Resolver póliza".` +
+          (empatados.length
+            ? `<div style="margin-top:6px">Igual de parecidos: ${empatados.map(c =>
+                `<button type="button" class="chip-item badge" data-ocr-valor="${escapeHtml(c.valor)}">${escapeHtml(c.valor)}</button>`).join(" ")}</div>`
+            : "");
+      } else {
+        ocrHint.innerHTML = `<span class="error">La imagen se leyó <strong>${escapeHtml(leido)}</strong>, pero no existe en ${escapeHtml(env)} ` +
+          `ni hay uno parecido: revisalo y corregilo a mano.</span>`;
+      }
+    }
+
+    ocrHint.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-ocr-valor]");
+      if (btn) polIdent.value = btn.dataset.ocrValor;
+    });
+
     async function handleOcrImage(file) {
       ocrHint.innerHTML = '<span class="spinner"></span> Cargando OCR…';
       try {
         await ensureTesseract();
-        const { data } = await Tesseract.recognize(file, "eng", {
+        const worker = await Tesseract.createWorker("eng", 1, {
           logger: (m) => {
             if (m.status === "recognizing text") {
               ocrHint.innerHTML = `<span class="spinner"></span> Leyendo imagen… ${Math.round((m.progress || 0) * 100)}%`;
             }
           },
         });
-        const text = data.text || "";
-        // Prioridad al formato policy_no/policy_lot (con "/", mas especifico
-        // y menos ambiguo que una tira larga de digitos suelta).
-        const slash = text.match(/\d+\/\d+\/\d+/g);
-        const digits = text.match(/\b\d{9,}\b/g);
-        const match = (slash && slash[0]) || (digits && digits[0]);
+        // Segunda pasada solo si la primera no encuentra nada: limitado a
+        // digitos y "/", Tesseract no confunde la barra con un espacio o un
+        // "[" (probado con capturas borrosas, 19/10). No es la primera porque
+        // en una captura con texto convierte las letras en digitos basura.
+        // Agrandar la imagen se probo y empeora: lee 4 como 6.
+        const textos = [];
+        let match = null;
+        try {
+          for (const whitelist of ["", "0123456789/"]) {
+            await worker.setParameters({ tessedit_char_whitelist: whitelist });
+            const { data } = await worker.recognize(file);
+            textos.push(data.text || "");
+            match = extraerIdentificador(data.text || "");
+            if (match) break;
+          }
+        } finally {
+          await worker.terminate();
+        }
+        const text = textos[0] || "";
         if (match) {
           polIdent.value = match;
-          ocrHint.innerHTML = `Extraído de la imagen: <strong>${escapeHtml(match)}</strong> — revisá y apretá "Resolver póliza".`;
+          await validarOcr(match);
         } else {
           ocrHint.innerHTML = `<span class="error">No se encontró ningún identificador reconocible en la imagen.</span>` +
             `<details style="margin-top:6px"><summary class="muted" style="cursor:pointer">Ver texto leído</summary>` +
@@ -1054,7 +1136,13 @@
       imgDropZone.classList.toggle("disabled", !enabled);
       imgDropZone.tabIndex = enabled ? 0 : -1;
     }
-    setEnvGatedEnabled(false);
+    // Al recargar, el navegador restaura el ambiente que estaba elegido en el
+    // <select> sin disparar "change": si se arrancara siempre bloqueado, el
+    // selector diria STST pero el campo y los botones quedarian
+    // deshabilitados (y el OCR igual llenaba el campo, sin poder editarlo).
+    // pageshow cubre la restauracion tardia y el volver atras (bfcache).
+    setEnvGatedEnabled(!!envEl.value);
+    window.addEventListener("pageshow", () => setEnvGatedEnabled(!!envEl.value));
 
     envEl.addEventListener("change", () => {
       productsLoadedFor = null;

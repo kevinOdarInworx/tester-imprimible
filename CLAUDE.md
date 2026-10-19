@@ -13,6 +13,11 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
    se pensó explícitamente; `Car_Mul_V3` hoy solo está desplegado en
    SIT/PREPROD, ver "Limitaciones conocidas"), arriba
    de todo, porque lo usan tanto la búsqueda de insumos como la ejecución.
+   Sin ambiente, los campos y botones quedan deshabilitados
+   (`setEnvGatedEnabled`). Al recargar, el navegador restaura el ambiente
+   elegido sin disparar `change`: por eso se evalúa también al cargar y en
+   `pageshow` (antes el selector decía STST pero el campo no se podía
+   editar).
    Debajo, la página se divide en tres pestañas: "Buscar pólizas" (Insumos,
    Pólizas encontradas, Endosos), "Comparador" (Configuración de la
    comparación, Casos de prueba) y "Descargar documentos" (ver más abajo).
@@ -478,15 +483,31 @@ por release. No consulta la base: lee `releases/AAAA-MM-DD.json`
   `cdn.jsdelivr.net` recién al primer uso (nunca al cargar la página) — a
   diferencia de todo lo demás en esta app y sus hermanas, esto **requiere
   internet** (sin conexión, el dropzone tira el error "No se pudo cargar
-  Tesseract.js"). El texto reconocido se busca con dos regex, en orden de
-  prioridad: `\d+/\d+/\d+` (formato policy_no/policy_lot, más específico)
-  y si no aparece, una tira de 9+ dígitos seguidos (policy_id). El match se
+  Tesseract.js"). El texto reconocido se busca con `extraerIdentificador`,
+  en orden de prioridad: la forma exacta de policy_lot (2/3/4-7 dígitos) o
+  policy_no (10/7/2) tolerando que la "/" se lea como espacio, `|`, `l`,
+  `I`, `!` o `[`/`(` (capturas poco nitidas: "00/414 144674" →
+  `00/414/144674`, normalizado con "/"); después `\d+/\d+/\d+` (la forma
+  exacta va antes para que una fecha no le gane); y si no, una tira de 9+
+  dígitos (policy_id/quote_id/engagement_id). Si la primera pasada no
+  encuentra nada, se reintenta con `tessedit_char_whitelist` = dígitos y
+  "/" (ahí la barra sale siempre). Probado el 19/10 en Node (tesseract.js
+  5) con la captura del usuario y versiones degradadas: agrandar/contrastar
+  la imagen antes del OCR empeora (lee 4 como 6) y se descartó; en las muy
+  borrosas la barra ya sale pero algún dígito puede venir cambiado. Según
+  la escala, la misma captura (00/414/144674) sale 144674, 164674 o 184674,
+  así que lo leído se **valida contra el ambiente** (`/ocr_candidates`,
+  `ocr_candidates` en `resolver.py`, ~1 s): si no existe tal cual, se busca
+  con `REGEXP_LIKE` en `policy` (policy_lot, policy_no o policy_id) cambiando
+  solo dígitos confundibles (`_OCR_CONFUSIONES`: 4↔6↔8, 3↔8, 1↔7…) y se
+  carga el que existe con menos dígitos distintos, avisando qué se leyó y
+  qué se corrigió; si hay empates se ofrecen como botones. Con
+  00/616/164674 en STST propone 00/414/144674. Si lo leído existe tal cual
+  no se toca (los policy_id son correlativos: casi siempre hay vecinos). El match se
   precarga en el campo de identificador pero **no dispara la búsqueda
   sola** — el usuario revisa y aprieta "Resolver póliza" a propósito, igual
-  que el resto de "Insumos". No se pudo probar el OCR de punta a punta en
-  esta sesión (necesita un navegador real con canvas/clipboard, no
-  disponible en las pruebas por Bash) — sí se verificó que la página
-  renderiza y que el cableado JS/CSS está completo.
+  que el resto de "Insumos". El pegado/arrastre en el navegador no se probó
+  desde acá; el reconocimiento y la extracción sí (Node, mismas regex).
 
 ## Convenciones
 

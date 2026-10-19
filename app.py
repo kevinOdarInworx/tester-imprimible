@@ -52,7 +52,7 @@ import instalar
 import repo_views
 from reports import OIC_PASSWORD, fetch_report
 from releases import get_release, list_releases
-from resolver import list_annexes, resolve as resolve_policy
+from resolver import list_annexes, ocr_candidates, resolve as resolve_policy
 from vistas import build_diff as build_view_diff, get_env_sources
 
 app = Flask(__name__)
@@ -197,6 +197,20 @@ def resolve_policy_route():
         "quote_id": result.get("quote_id"),
         "engagements": result.get("engagements", []),
     })
+
+
+@app.route("/ocr_candidates", methods=["POST"])
+def ocr_candidates_route():
+    """Valida contra el ambiente el identificador que leyo el OCR de una
+    captura y propone los parecidos que existen (ver ocr_candidates)."""
+    data = request.get_json(silent=True) or {}
+    env = data.get("env", "")
+    if env not in ENVIRONMENTS:
+        return jsonify({"error": "Ambiente invalido."}), 400
+    try:
+        return jsonify(ocr_candidates(env, data.get("value", "")))
+    except Exception as exc:  # tunel / conexion / oracle
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
 
 
 @app.route("/policy_annexes", methods=["POST"])

@@ -9,6 +9,7 @@ dos formas de identificador que no son una columna directa de policy).
 """
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -195,6 +196,45 @@ def engagement_of_policies(env_key: str, policy_ids) -> dict:
                 _serialize(pid): {"engagement_id": _serialize(eng), "eng_pol_type": tipo}
                 for pid, eng, tipo in cur.fetchall()
             }
+
+
+# OCR de capturas: digito leido -> digitos que puede ser en realidad.
+# Tesseract confunde digitos segun la escala de la imagen: la misma captura
+# (00/414/144674) salio 144674, 164674 o 184674 (19/10). Las clases son
+# chicas a proposito: con clases anchas casi cualquier lectura "existe" (los
+# numeros son correlativos).
+_OCR_CONFUSIONES = {"0": "08", "1": "17", "2": "2", "3": "38", "4": "46",
+                    "5": "56", "6": "4568", "7": "17", "8": "03468", "9": "89"}
+# Formas que se validan contra policy (quote_id/engagement_id no).
+_OCR_FORMAS = [(r"\d{2}/\d{3}/\d{4,7}", "policy_lot"),
+               (r"\d{10}/\d{7}/\d{2}", "policy_no"),
+               (r"1\d{11}", "TO_CHAR(policy_id)")]
+
+
+def ocr_candidates(env_key: str, value: str) -> dict:
+    """Lo que el OCR leyo, contra lo que existe en el ambiente: si no existe
+    tal cual, los identificadores de policy que difieren solo en digitos
+    confundibles, del mas parecido al menos (cambios = digitos distintos).
+    ~1 s en PROD/STST (REGEXP_LIKE sobre ~200 mil polizas)."""
+    value = (value or "").strip()
+    col = next((c for pat, c in _OCR_FORMAS if re.fullmatch(pat, value)), None)
+    if not col:
+        return {"aplica": False}
+    patron = "^" + "".join(f"[{_OCR_CONFUSIONES[ch]}]" if ch.isdigit() else ch for ch in value) + "$"
+    with get_connection(env_key) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"SELECT DISTINCT {col} FROM insis_gen_v10.policy "
+                f"WHERE LENGTH({col}) = :n AND REGEXP_LIKE({col}, :re) "
+                "FETCH FIRST 50 ROWS ONLY",
+                {"n": len(value), "re": patron},
+            )
+            existentes = {r[0] for r in cur.fetchall()}
+    candidatos = sorted(
+        ({"valor": e, "cambios": sum(a != b for a, b in zip(value, e))} for e in existentes),
+        key=lambda c: (c["cambios"], c["valor"]),
+    )
+    return {"aplica": True, "exacto": value in existentes, "candidatos": candidatos[:5]}
 
 
 def quotes_of_policies(env_key: str, policy_ids) -> dict:
