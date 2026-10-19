@@ -197,6 +197,25 @@ def engagement_of_policies(env_key: str, policy_ids) -> dict:
             }
 
 
+def quotes_of_policies(env_key: str, policy_ids) -> dict:
+    """policy_id -> quote_id (policy_eng_policies; una poliza tiene a lo sumo
+    uno, STST 19/10). Lo tienen las cotizaciones (-4) y las emitidas que
+    salieron de una."""
+    policy_ids = sorted({int(p) for p in policy_ids if p is not None})
+    if not policy_ids:
+        return {}
+    binds = {f"p{i}": p for i, p in enumerate(policy_ids)}
+    with get_connection(env_key) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT policy_id, MAX(quote_id) FROM insis_gen_v10.policy_eng_policies "
+                f"WHERE policy_id IN ({', '.join(':' + k for k in binds)}) AND quote_id IS NOT NULL "
+                "GROUP BY policy_id",
+                binds,
+            )
+            return {_serialize(pid): _serialize(q) for pid, q in cur.fetchall()}
+
+
 def engagement_tree(env_key: str, engagement_ids) -> list[dict]:
     """Estructura de cada engagement de autos multinciso, para el recuadro
     "Engagement": sus maestras y, debajo de cada una, sus incisos
@@ -302,6 +321,9 @@ def resolve(env_key: str, raw: str) -> dict:
         engs = engagement_of_policies(env_key, [m["policy_id"] for m in sin_engagement])
         for m in sin_engagement:
             m.update(engs.get(m["policy_id"], {}))
+    quotes = quotes_of_policies(env_key, [m["policy_id"] for m in matches])
+    for m in matches:
+        m["quote_id"] = quotes.get(m["policy_id"])
     result["engagements"] = engagement_tree(env_key, [
         m.get("engagement_id") for m in matches if str(m.get("insr_type") or "").startswith("1")])
     return result

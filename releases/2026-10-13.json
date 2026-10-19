@@ -1,0 +1,221 @@
+{
+  "fecha": "2026-10-13",
+  "nombre": "GDS - MX - VoBo liberación a Prod 13 de octubre de 2026",
+  "fuente": "Correo de VoBo del 12/10/2026 (listado completo, 10 ítems). Lo que tocamos sale de los commits del repo INSOR, del estado de cada ítem en Azure DevOps y del texto de las vistas en STST y PROD. Instalado y validado en PROD el 13/10/2026 (PDF de cada incidente generados en PROD).",
+  "notas": [
+    "Lo nuestro se instaló en PROD el 13/10 entre las 07:00 y las 07:17: REC_NOT_NETEADO_VIEW, CALCULUS_V5_VIEW (ya estaba igual desde el 08/10) y END_IND_AUTOS_DANIOS_VIEW. No se tocó ningún Jasper.",
+    "END_IND_AUTOS_DANIOS_VIEW se instaló primero con el último commit de develop (05966b5f), que trae la baja de inciso de US 325736 y no va en este pase. A las 07:17 se volvió a la versión del commit 2c73bf7a. Por eso en la foto PROD figura distinta del repo: develop sigue con US 325736, que tiene que salir junto con su sr_description_box.jrxml.",
+    "La versión de END_IND_AUTOS_DANIOS_VIEW que va (2c73bf7a) también lleva el cambio de paquete (task 322658) y los ajustes de cancelaciones de INC1108693. El End_Ind.jrxml de 322658 no se subió: no hay endosos de cambio de paquete (razón 68) en PROD.",
+    "INC1108753 e INC1108693 no figuran en el correo, pero su vista (REC_NOT_NETEADO_VIEW) se instaló en este pase.",
+    "El commit del arreglo de INC1108749 (2c73bf7a) quedó rotulado INC1108745.",
+    "305322, 306477, 228871, 321969 y 327639 no tienen commits en INSOR y figuran Closed en Azure DevOps. 306465 figura en el correo pero en Azure DevOps sigue In Analysis (último cambio 08/10)."
+  ],
+  "items": [
+    {
+      "id": "INC1108751",
+      "tipo": "Incidente",
+      "track": "L2-INSOR",
+      "titulo": "No genera recibo en endoso de cambio de forma de pago",
+      "lado": "imprimibles",
+      "vistas": [
+        "CALCULUS_V5_VIEW"
+      ],
+      "jasper": [],
+      "commits": [
+        "0a9f3892"
+      ],
+      "nota": "Póliza 0400101002/0128444/00 (4/703/128444), recibo en blanco. Se sumó a la lista del filtro del pago cero, con un ajuste para su cuota 1; en PROD desde el 08/10. El error de origen es de INSIS: la nota de crédito se aplicó a las cuotas nuevas y el recibo de contado sigue pendiente."
+    },
+    {
+      "id": "INC1108745",
+      "tipo": "Incidente",
+      "track": "L2-INSOR",
+      "titulo": "No genera la totalidad de los recibos cambio de forma de pago de contado a Semestral",
+      "lado": "imprimibles",
+      "vistas": [
+        "CALCULUS_V5_VIEW"
+      ],
+      "jasper": [],
+      "commits": [
+        "0a9f3892"
+      ],
+      "nota": "Filtro por lista de 14 pólizas, solo en PROD, para el pago cero de INSIS del 21/09 al 01/10. En PROD desde el 08/10; hoy se reinstaló igual. Solo corrige el PDF: en INSIS los recibos viejos siguen pendientes."
+    },
+    {
+      "id": "INC1108749",
+      "tipo": "Incidente",
+      "track": "L2-INSOR",
+      "titulo": "Error en el impreso de endoso de Cambio de Cliente",
+      "lado": "imprimibles",
+      "vistas": [
+        "END_IND_AUTOS_DANIOS_VIEW"
+      ],
+      "jasper": [],
+      "commits": [
+        "2c73bf7a"
+      ],
+      "nota": "Busca el contratante anterior aunque INSIS no lo haya cerrado (aux_annex_id null). Validado con 17/701/116647, endoso 3000104192."
+    },
+    {
+      "id": "305322",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "titulo": "GDS - MULTIINCISO - CAMIONES - Se amapara Vida Auto sin beneficiario y no arroja mensaje",
+      "lado": "no_aplica",
+      "nota": "Validación de emisión multiinciso. Sin commits en INSOR; Closed en Azure DevOps el 13/10."
+    },
+    {
+      "id": "228871",
+      "tipo": "HU",
+      "track": "Evolutivo",
+      "titulo": "Endoso de cambio de cliente",
+      "lado": "no_aplica",
+      "nota": "Funcionalidad del endoso en INSIS. Sin commits en INSOR; Closed en Azure DevOps el 12/10."
+    },
+    {
+      "id": "306477",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "titulo": "GDS - MULTIINCISO - PICK UP INDIVIDUAL - No arroja mensaje de error correcto para DED_RT",
+      "lado": "no_aplica",
+      "nota": "Validación de emisión multiinciso. Sin commits en INSOR; Closed en Azure DevOps el 13/10."
+    },
+    {
+      "id": "306465",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "titulo": "GDS - MULTIINCISO - Transversal | Error con el CP_CIRCULACION fuera del rango válido para el producto",
+      "lado": "no_aplica",
+      "confirmar": true,
+      "nota": "Validación de emisión multiinciso. Sin commits en INSOR. En Azure DevOps sigue In Analysis (último cambio 08/10): confirmar si va."
+    },
+    {
+      "id": "INC1108624",
+      "tipo": "Incidente",
+      "track": "L2",
+      "titulo": "No permite emitir pólizas Multi inciso Autos.",
+      "lado": "sin_registro",
+      "nota": "Emisión multiinciso de Autos; no es de imprimibles."
+    },
+    {
+      "id": "321969",
+      "tipo": "US",
+      "track": "Evolutivo",
+      "titulo": "Configuración de Sumas Aseguradas No Configuradas para Productos de Autos",
+      "lado": "no_aplica",
+      "nota": "Configuración de INSIS. Sin commits en INSOR; Closed en Azure DevOps el 12/10."
+    },
+    {
+      "id": "327639",
+      "tipo": "Bug",
+      "track": "Evolutivo",
+      "titulo": "GDS| Daños | Protección Empresarial PYME | Mantenimiento - Endoso Cambio de Cliente- No permite concluir endoso marca error documento facultativo",
+      "lado": "no_aplica",
+      "nota": "Error de INSIS al concluir el endoso. Sin commits en INSOR; Closed en Azure DevOps el 12/10."
+    },
+    {
+      "id": "INC1108753",
+      "tipo": "Incidente",
+      "track": "L2-INSOR",
+      "en_correo": false,
+      "titulo": "Protección Empresarial - pol 20/951/78149 - end Aumento de Sa: plan de pagos correcto, recibo incorrecto",
+      "lado": "imprimibles",
+      "vistas": [
+        "REC_NOT_NETEADO_VIEW"
+      ],
+      "jasper": [],
+      "commits": [
+        "02a8acc7",
+        "e2a2ead3"
+      ],
+      "nota": "El recibo restaba la reversa de un endoso anulado (estado 30): 2,366.02 en vez de 15,340.14. Error nuestro, no de INSIS. Validado en PROD: PREMIUM-261069 = 15,340.14."
+    },
+    {
+      "id": "INC1108693",
+      "tipo": "Incidente",
+      "track": "L2-INSOR",
+      "en_correo": false,
+      "titulo": "Endoso y nota de crédito de cancelación con montos incorrectos (24/701/110851)",
+      "lado": "imprimibles",
+      "vistas": [
+        "REC_NOT_NETEADO_VIEW",
+        "END_IND_AUTOS_DANIOS_VIEW"
+      ],
+      "jasper": [],
+      "commits": [
+        "67037a82",
+        "02a8acc7",
+        "e2a2ead3"
+      ],
+      "nota": "La cancelación muestra solo lo que se devuelve. Usa CANCELACION_DEVOLUCION_VIEW, instalada en PROD el 08/10. Validado en PROD: endoso y nota de crédito = 1,333.30."
+    },
+    {
+      "id": "322658",
+      "tipo": "Task",
+      "track": "Evolutivo",
+      "en_correo": false,
+      "titulo": "INSOR - Generación de imprimible Endoso de Cambio de Paquete",
+      "lado": "imprimibles",
+      "vistas": [
+        "END_IND_AUTOS_DANIOS_VIEW"
+      ],
+      "jasper": [],
+      "commits": [
+        "ad26ae5c"
+      ],
+      "nota": "Va arrastrado en la vista del endoso. Su End_Ind.jrxml no se subió; no hay endosos de cambio de paquete en PROD."
+    }
+  ],
+  "foto": {
+    "tomada": "2026-10-13T08:29:28",
+    "ref": "origin/develop",
+    "errores": {},
+    "vistas": {
+      "CALCULUS_V5_VIEW": {
+        "archivo": "GDS/Complementarias/calculusV5_acumulativo.sql",
+        "commit": {
+          "hash": "0a9f3892",
+          "date": "2026-10-08",
+          "author": "Kevin Odar",
+          "subject": "INC1108745 recibo calculus v5 - se agrega al filtro mas polizas de con este error"
+        },
+        "md5_repo": "3a2ddee3524cb2a6a1ac98b19c87ca89",
+        "md5": {
+          "UAT": "013f345a871e9bf420c5481418d8a206",
+          "STST": "2fc6b5518be52f4dd5bfed0339d1da09",
+          "PROD": "3a2ddee3524cb2a6a1ac98b19c87ca89"
+        }
+      },
+      "END_IND_AUTOS_DANIOS_VIEW": {
+        "archivo": "GDS/FASE 1/end-ind_autos_danios.sql",
+        "commit": {
+          "hash": "05966b5f",
+          "date": "2026-10-12",
+          "author": "Kevin Odar",
+          "subject": "US325736 endind - baja de inciso - multiinciso autos"
+        },
+        "md5_repo": "576ab70533cf14929ca59cb5e36d666d",
+        "md5": {
+          "UAT": "82872bcc22b1d0833b7f9475a3733a7c",
+          "STST": "576ab70533cf14929ca59cb5e36d666d",
+          "PROD": "23f9b534298651d9c969b3d491ade5ca"
+        }
+      },
+      "REC_NOT_NETEADO_VIEW": {
+        "archivo": "GDS/FASE 1/rec-pag_nota-cred-acumulativo.sql",
+        "commit": {
+          "hash": "e2a2ead3",
+          "date": "2026-10-08",
+          "author": "Kevin Odar",
+          "subject": "INC1108693 rec pag - ajsute para que en las cancelaciones la nota de credito no muestre valores en 0"
+        },
+        "md5_repo": "7a16b3a379b4d81ea74884705f2c5164",
+        "md5": {
+          "UAT": "5f27ad097466aa500dc3c1cb66cf208b",
+          "STST": "7a16b3a379b4d81ea74884705f2c5164",
+          "PROD": "7a16b3a379b4d81ea74884705f2c5164"
+        }
+      }
+    }
+  }
+}

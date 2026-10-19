@@ -182,7 +182,7 @@ def resolve_policy_route():
             "policy_lot": m.get("policy_lot"),
             "insr_type": m.get("insr_type"),
             "policy_state": m.get("policy_state"),
-            "quote_id": None,
+            "quote_id": m.get("quote_id"),
             "eng_pol_type": m.get("eng_pol_type"),
             "engagement_id": m.get("engagement_id"),
             "annex_id": 0,

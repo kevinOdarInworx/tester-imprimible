@@ -101,7 +101,10 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
    Ambas pestañas de "Insumos" alimentan la misma tabla "Pólizas encontradas"
    y son **independientes de la comparación**: buscan pólizas para
    *conocerlas* (con `policy_id`, `policy_no`, `policy_lot`, `insr_type`,
-   `policy_state`, y `quote_id` si aplica) y no tocan "Casos de prueba" por
+   `policy_state`, y `quote_id` si aplica — en "Por identificador" sale de
+   `policy_eng_policies` vía `quotes_of_policies`, solo informativo: esos
+   casos se comparan igual por `policy_id`/`annex_id`, y `paramsLabel`
+   muestra `quote_id=` solo si `params` es `[quote_id]`) y no tocan "Casos de prueba" por
    sí solas. Solo el botón "Usar estas pólizas en el comparador" (al final de
    los resultados, visible únicamente después de una búsqueda con
    resultados) pasa esa tanda a `cases` y cambia a la pestaña "Comparador".

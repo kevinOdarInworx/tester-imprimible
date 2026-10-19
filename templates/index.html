@@ -1263,7 +1263,9 @@
       // cada string_param con lo que realmente representa (en vez de un
       // generico "string_param1/2") para no tener que adivinarlo ni repetir
       // poliza/endoso en columnas aparte.
-      if (c.quote_id != null) return `quote_id=${c.quote_id}`;
+      // Las polizas de "Por identificador" traen quote_id solo informativo
+      // (se comparan por policy_id/annex_id): manda lo que diga params.
+      if (c.quote_id != null && c.params && c.params.length === 1 && c.params[0] === c.quote_id) return `quote_id=${c.quote_id}`;
       const policyId = c.params && c.params[0] != null ? c.params[0] : c.policy_id;
       const annexId = c.annex_id != null ? c.annex_id : (c.params ? c.params[1] : undefined);
       return `policy_id=${policyId ?? "—"}<br>annex_id=${annexId ?? "—"}`;
