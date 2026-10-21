@@ -353,10 +353,8 @@ def resolve(env_key: str, raw: str) -> dict:
                     matches.extend(lookup_policy(env_key, str(pid))["matches"])
     # Por policy_no/policy_lot/quote_id no se sabe si es de un multinciso de
     # autos: se busca su engagement (el path por engagement_id ya lo trae).
-    # Solo autos (insr_type 1xxx): en danios tambien hay filas MASTER en
-    # policy_eng_policies (0600201107/0135867/00 en PROD) y no aplica.
     sin_engagement = [m for m in matches if not m.get("engagement_id")
-                      and str(m.get("insr_type") or "").startswith("1")]
+                      and _usa_maestra(m.get("insr_type"))]
     if sin_engagement:
         engs = engagement_of_policies(env_key, [m["policy_id"] for m in sin_engagement])
         for m in sin_engagement:
@@ -365,5 +363,16 @@ def resolve(env_key: str, raw: str) -> dict:
     for m in matches:
         m["quote_id"] = quotes.get(m["policy_id"])
     result["engagements"] = engagement_tree(env_key, [
-        m.get("engagement_id") for m in matches if str(m.get("insr_type") or "").startswith("1")])
+        m.get("engagement_id") for m in matches if _usa_maestra(m.get("insr_type"))])
     return result
+
+
+def _usa_maestra(insr_type) -> bool:
+    """Productos con maestra/dependiente en policy_eng_policies: autos
+    (insr_type 1xxx) y, como excepcion de daños, 4005 INFONAVIT (su maestra
+    contenedora se arma como una flotilla de autos; DEV 880000000022825
+    mezcla maestras 1020/1025/4005). En el resto de daños tambien hay filas
+    MASTER (0600201107/0135867/00 en PROD) pero los incisos son objetos
+    asegurados, no polizas dependientes."""
+    t = str(insr_type or "")
+    return t.startswith("1") or t == "4005"

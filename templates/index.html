@@ -953,10 +953,26 @@
     // poliza buscada resaltada. Aparte de "Pólizas encontradas" porque esa
     // tabla sirve para cualquier poliza y la mayoria no es de un engagement.
     // Un engagement puede tener hasta 2000 incisos: por maestra se muestran
-    // los primeros ENG_MAX_INCISOS, mas los buscados.
-    const ENG_MAX_INCISOS = 10;
+    // los primeros ENG_MAX_INCISOS, mas los buscados, y "Ver N más" agrega
+    // de a ENG_PASO (cuantos se ven va en engState.visibles, por maestra).
+    const ENG_MAX_INCISOS = 10, ENG_PASO = 25;
+    let engState = { engs: [], buscadas: new Set(), visibles: {} };
 
     function renderEngagements(engs, buscadas) {
+      engState = { engs, buscadas, visibles: {} };
+      dibujarEngagements();
+    }
+
+    engBody.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-eng-mas]");
+      if (!btn) return;
+      const key = btn.dataset.engMas;
+      engState.visibles[key] = (engState.visibles[key] ?? ENG_MAX_INCISOS) + ENG_PASO;
+      dibujarEngagements();
+    });
+
+    function dibujarEngagements() {
+      const { engs, buscadas, visibles } = engState;
       if (!engs.length) { engCard.style.display = "none"; return; }
       const fila = (p, rol, clase) => `
         <tr class="${clase}${buscadas.has(p.policy_id) ? " sel" : ""}">
@@ -966,11 +982,13 @@
           <td>${p.insr_type ?? "—"}</td>
           <td>${p.policy_state ?? "—"}</td>
         </tr>`;
-      const incisos = list => {
-        const visibles = list.filter((d, i) => i < ENG_MAX_INCISOS || buscadas.has(d.policy_id));
-        const resto = list.length - visibles.length;
-        return visibles.map(d => fila(d, `└ Inciso ${d.inciso ?? "?"}`, "eng-dep")).join("")
-          + (resto > 0 ? `<tr class="eng-dep"><td class="eng-rol muted" colspan="5">… y ${resto} inciso(s) más</td></tr>` : "");
+      const incisos = (list, key) => {
+        const limite = visibles[key] ?? ENG_MAX_INCISOS;
+        const mostrar = list.filter((d, i) => i < limite || buscadas.has(d.policy_id));
+        const resto = list.length - mostrar.length;
+        return mostrar.map(d => fila(d, `└ Inciso ${d.inciso ?? "?"}`, "eng-dep")).join("")
+          + (resto > 0 ? `<tr class="eng-dep"><td class="eng-rol muted" colspan="5">… y ${resto} inciso(s) más
+              <button type="button" class="chip-item badge" style="margin-left:10px" data-eng-mas="${key}">Ver ${Math.min(ENG_PASO, resto)} más</button></td></tr>` : "");
       };
       engBody.innerHTML = engs.map(e => {
         const resumen = [];
@@ -987,8 +1005,8 @@
               <table class="cases centered eng-tree">
                 <thead><tr><th>Rol</th><th>Policy ID</th><th>Policy No</th><th>INSR_TYPE</th><th>Policy State</th></tr></thead>
                 <tbody>
-                  ${e.masters.map(m => fila(m, "Maestra", "eng-master") + incisos(m.incisos)).join("")}
-                  ${e.sin_maestra.length ? `<tr class="eng-master"><td class="eng-rol" colspan="5">Sin maestra en el engagement</td></tr>` + incisos(e.sin_maestra) : ""}
+                  ${e.masters.map(m => fila(m, "Maestra", "eng-master") + incisos(m.incisos, `${e.engagement_id}:${m.policy_id}`)).join("")}
+                  ${e.sin_maestra.length ? `<tr class="eng-master"><td class="eng-rol" colspan="5">Sin maestra en el engagement</td></tr>` + incisos(e.sin_maestra, `${e.engagement_id}:sin`) : ""}
                 </tbody>
               </table>
             </div>

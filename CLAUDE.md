@@ -76,6 +76,11 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
      23/701/138221 → dependiente de 880000000025032). En daños no se busca:
      también tienen filas MASTER en `policy_eng_policies`
      (0600201107/0135867/00 en PROD) y no son multinciso de autos.
+     **Excepción: 4005 (INFONAVIT)** se trata como autos (`_usa_maestra`):
+     su maestra contenedora se arma como una flotilla y tiene dependientes
+     de verdad (DEV 100000150813: maestra con 48 incisos en el engagement
+     880000000022825, que mezcla maestras 1020/1025/4005). Es solo para
+     "Buscar pólizas"; "Descargar documentos" la sigue tratando como daños.
 
      La relación entre ellos va en un recuadro aparte, **"Engagement"**
      (entre "Pólizas encontradas" y "Endosos"), no como columnas de la tabla:
@@ -85,7 +90,8 @@ mismo contenido para pólizas reales, aunque una sea mucho más rápida.
      sus incisos (DEPENDENT por `master_policy_id`, número de inciso =
      `policy.attr5`). Un engagement puede tener varias maestras (una por
      producto: STST 880000000025060 tiene 1020/1030/1055) y hasta 2000
-     incisos, así que por maestra se muestran 10 + los buscados. La póliza
+     incisos, así que por maestra se muestran 10 + los buscados, y el botón
+     "Ver N más" agrega de a 25 (`engState.visibles`, por maestra). La póliza
      buscada se resalta y arriba dice de qué maestra es inciso; buscando el
      engagement mismo no se resalta nada (ya están todas en la tabla).
 
