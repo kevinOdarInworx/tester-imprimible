@@ -366,9 +366,10 @@ def compute_documents(env_key: str, policy: dict) -> dict:
             if not a["annex_id"]:
                 continue  # annex 0 es la emision, ya va aparte
             # annex_no = letra del endoso + "-" + numero (annex_details_view).
-            # Puede venir sin letra ("-104767") o sin numero ("C-": visto en
-            # PROD en cancelaciones por falta de pago, varias en la misma
-            # poliza) — sin numero se agrega el annex_id para distinguirlas.
+            # Puede venir sin letra ("-104767"). Las cancelaciones sin numero
+            # ("C-") ya llegan completadas con el annex_id (ver
+            # _completar_no_endoso en resolver.py); si igual faltara el
+            # numero, se agrega el annex_id para distinguirlas.
             letra, _, numero = (a["annex_no"] or "").partition("-")
             if numero:
                 annex_no = a["annex_no"]
@@ -463,9 +464,15 @@ def compute_documents(env_key: str, policy: dict) -> dict:
                                      "los recibos anteriores (no se muestra)")
                     if r["en_blanco"]:
                         notas.append("Todas sus cuotas están pagadas: la versión neteada de Rec_Pag lo devuelve en blanco")
+                    # Cuando INSIS creo el documento (blc_documents.created_on),
+                    # no cuando lo imprimio. issue_date no sirve: es solo la
+                    # fecha contable y en las corridas nocturnas queda en el
+                    # dia anterior (PREMIUM-251410 en PROD: creado 11/09 00:16,
+                    # issue_date 10/09).
+                    generado = r["created_on"].strftime("%d/%m/%Y %H:%M") if r["created_on"] else None
                     items.append({**_item("Rec_Pag", [doc], subtitulo=f"{version} — {doc}",
                                           nota=" · ".join(notas) or None),
-                                  "annex_id": annex})
+                                  "annex_id": annex, "generado": generado})
 
             for c in _claims(cur, policy_id):
                 sub = f"{c['claim_regid'] or c['claim_id']} - {c['claim_type'] or ''}".strip(" -")

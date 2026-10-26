@@ -302,6 +302,18 @@ def engagement_tree(env_key: str, engagement_ids) -> list[dict]:
     return tree
 
 
+def _completar_no_endoso(no_endoso, annex_id):
+    """annex_details_view arma no_endoso = letra || '-' || substr(annex_no, -6).
+    En las cancelaciones (C) INSIS guarda annex_no corto ("2", "3": ~46 mil
+    endosos en PROD) y en Oracle substr de un texto mas corto que 6 da NULL,
+    asi que llega "C-". Se completa con los ultimos 6 digitos del annex_id:
+    en los C con annex_no completo, annex_no = annex_id (6040 en PROD, 22/10),
+    asi que es el mismo numero que INSIS les pone a esos."""
+    if no_endoso and no_endoso.endswith("-") and annex_id:
+        return no_endoso + str(annex_id)[-6:]
+    return no_endoso
+
+
 def list_annexes(env_key: str, policy_id) -> list[dict]:
     """Endosos de una poliza. Sale de insor_gds.annex_details_view y no de
     CONSUTA_DE_ENDOSOS_VIEW (la que usa _endosos en generar-imprimibles):
@@ -326,7 +338,7 @@ def list_annexes(env_key: str, policy_id) -> list[dict]:
         {
             "policy_id": r["policy_id"],
             "annex_id": r["annex_id"],
-            "annex_no": r["no_endoso"],
+            "annex_no": _completar_no_endoso(r["no_endoso"], r["annex_id"]),
             "tipo_endoso": r["tipo_endoso"],
             "tipificacion": r["name"],
         }

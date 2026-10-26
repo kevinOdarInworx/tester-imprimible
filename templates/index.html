@@ -1699,7 +1699,7 @@
             <div class="doc-t">${escapeHtml(String(title))}</div>
             ${sub ? `<div class="doc-s">${escapeHtml(sub)}</div>` : ""}
             <div class="doc-params">${escapeHtml(params)}</div>
-            ${it.annex_id != null ? `<div class="doc-params">annex_id ${it.annex_id}</div>` : ""}
+            ${it.annex_id != null ? `<div class="doc-params">annex_id ${it.annex_id}${it.generado ? ` · generado el ${escapeHtml(it.generado)}` : ""}</div>` : ""}
             ${it.nota ? `<div class="doc-note">${escapeHtml(it.nota)}</div>` : ""}
             <div class="doc-result"></div>
             ${insisHtml(it.insis)}

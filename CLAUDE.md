@@ -238,9 +238,19 @@ Diferencias con generar-imprimibles, a partir de lo aprendido (skills
   no mueven prima y no generan recibo (01/951/144287 en PROD: un recibo de
   emisión + dos filas vacías por sus dos endosos B). Recibos de un annex que
   no está en `annex_details_view` (endoso excluido por `annex_state`) van al
-  final con su `annex_id`. Si el `annex_no` viene sin número (`C-`, visto en
-  PROD en varias cancelaciones por falta de pago de la misma póliza,
-  100000143673) se le agrega el `annex_id` para poder distinguirlas.
+  final con su `annex_id`. Las cancelaciones llegaban sin número (`C-`):
+  INSIS les guarda `annex_no` corto ("2", "3"; ~46 mil endosos C en PROD) y
+  `annex_details_view` toma `substr(annex_no, -6)`, que en Oracle da NULL
+  con textos de menos de 6 caracteres. `_completar_no_endoso`
+  (`resolver.py`, así lo ven también la tarjeta "Endosos") lo completa con
+  los últimos 6 dígitos del `annex_id`, que es el número que INSIS les pone
+  a los C con `annex_no` completo (ahí annex_no = annex_id, 6040 en PROD):
+  100000194618 en PROD → C-101430 y C-108965.
+- **Fecha del recibo:** cada recibo muestra "generado el …" junto al
+  `annex_id`: `blc_documents.created_on`, cuándo INSIS creó el documento
+  (la de "En INSIS" es cuándo lo imprimió). No `issue_date`: es solo fecha
+  contable y en las corridas nocturnas queda en el día anterior
+  (PREMIUM-251410 en PROD: creado 11/09 00:16, issue_date 10/09).
 - **Cambio de forma de pago / de agente:** en un endoso con razón 11 o
   `CHNGAGENT`, INSIS genera en el mismo segundo una nota de crédito que
   anula los recibos anteriores y el recibo nuevo (0600201107/0135867/00 en
